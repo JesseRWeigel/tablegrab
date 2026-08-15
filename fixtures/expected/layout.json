@@ -1,0 +1,35 @@
+{
+  "file": "layout.html",
+  "note": "Three tables. The first is page furniture and must be refused. The second is the real data inside it and must be accepted. The third announces itself with role=presentation.",
+  "tables": [
+    {
+      "index": 0,
+      "isData": false,
+      "width": 2,
+      "height": 2,
+      "reasonsInclude": ["contains a nested table", "no th cells anywhere"]
+    },
+    {
+      "index": 1,
+      "isData": true,
+      "caption": "Quarterly headcount",
+      "width": 3,
+      "height": 4,
+      "headerRows": 1,
+      "columns": ["Quarter", "Engineering", "Sales"],
+      "types": ["string", "number", "number"],
+      "values": [
+        ["Q1", 42, 18],
+        ["Q2", 47, 21],
+        ["Q3", 51, 26]
+      ]
+    },
+    {
+      "index": 2,
+      "isData": false,
+      "width": 2,
+      "height": 2,
+      "reasonsInclude": ["role=\"presentation\""]
+    }
+  ]
+}

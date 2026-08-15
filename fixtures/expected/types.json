@@ -1,0 +1,28 @@
+{
+  "file": "types.html",
+  "index": 0,
+  "note": "The negative controls. Version, Phone, ZIP and Part must stay text. ZIP is the one that matters: two of its three values have a leading zero, so the whole column is text and 10001 must not come out as a number in a column where its neighbours are strings.",
+  "caption": "Release ledger",
+  "width": 9,
+  "height": 4,
+  "headerRows": 1,
+  "columns": ["Package", "Version", "Phone", "ZIP", "Part", "Change", "Balance", "Rate", "Ratio"],
+  "labels": ["Package", "Version", "Phone", "ZIP", "Part", "Change (%)", "Balance", "Rate", "Ratio"],
+  "types": ["string", "string", "string", "string", "string", "number", "number", "number", "number"],
+  "sqlTypes": ["TEXT", "TEXT", "TEXT", "TEXT", "TEXT", "REAL", "REAL", "REAL", "REAL"],
+  "rectangle": [
+    ["Package", "Version", "Phone", "ZIP", "Part", "Change", "Balance", "Rate", "Ratio"],
+    ["tablegrab", "1.2.3", "555-0134", "07030", "X-100", "+12.5%", "(1,234.56)", "0", "1.234"],
+    ["subwatch", "2.0.0", "555-0199", "02139", "X-200", "-3.5%", "2,000", "0.5", "2.5"],
+    ["hexcheck", "10.4.1", "555-1234", "10001", "X-300", "0%", "-15.5", "1", "0.75"]
+  ],
+  "values": [
+    ["tablegrab", "1.2.3", "555-0134", "07030", "X-100", 12.5, -1234.56, 0, 1.234],
+    ["subwatch", "2.0.0", "555-0199", "02139", "X-200", -3.5, 2000, 0.5, 2.5],
+    ["hexcheck", "10.4.1", "555-1234", "10001", "X-300", 0, -15.5, 1, 0.75]
+  ],
+  "footRows": [],
+  "ragged": [],
+  "notes": [],
+  "isData": true
+}

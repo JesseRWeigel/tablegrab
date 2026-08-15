@@ -1,0 +1,37 @@
+{
+  "file": "ragged.html",
+  "index": 0,
+  "note": "Three header rows with no thead, one short row that must leave the tail empty rather than shifting left, and a rowspan=\"0\" that runs to the end of the section. Written out by hand from the HTML.",
+  "caption": "",
+  "width": 5,
+  "height": 7,
+  "headerRows": 3,
+  "columns": [
+    "Item",
+    "Measurements / Metric / Length (mm)",
+    "Measurements / Metric / Mass (kg)",
+    "Measurements / Imperial / Length (in)",
+    "Measurements / Imperial / Mass (lb)"
+  ],
+  "types": ["string", "number", "number", "number", "number"],
+  "sqlTypes": ["TEXT", "INTEGER", "INTEGER", "REAL", "INTEGER"],
+  "rectangle": [
+    ["Item", "Measurements", "Measurements", "Measurements", "Measurements"],
+    ["Item", "Metric", "Metric", "Imperial", "Imperial"],
+    ["Item", "Length (mm)", "Mass (kg)", "Length (in)", "Mass (lb)"],
+    ["Rail [1]", "1 435", "60", "56.5", "132"],
+    ["Sleeper", "2 600", "250", "", ""],
+    ["Ballast", "300", "1 800", "11.8", "3 968"],
+    ["Ballast", "350", "1 900", "13.8", "4 189"]
+  ],
+  "values": [
+    ["Rail [1]", 1435, 60, 56.5, 132],
+    ["Sleeper", 2600, 250, null, null],
+    ["Ballast", 300, 1800, 11.8, 3968],
+    ["Ballast", 350, 1900, 13.8, 4189]
+  ],
+  "footRows": [],
+  "ragged": [{ "row": 4, "filled": 3, "width": 5 }],
+  "notes": ["row 5 col 0: rowspan=\"0\" expanded to 2 rows"],
+  "isData": true
+}

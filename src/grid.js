@@ -114,8 +114,9 @@ function headerRowCount(rows, slots) {
     if (!anchors.every((slot) => slot.header)) break;
     count += 1;
   }
-  // Every row being a header means the table is a list of labels, not a header block.
-  if (count === slots.length) return slots.length > 1 ? 1 : 0;
+  // Every row being a header usually means a grid of labels rather than a header block that
+  // deep, so only the first row is taken as the header and the rest become data.
+  if (count === slots.length && slots.length > 1) return 1;
   return count;
 }
 

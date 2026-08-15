@@ -1,0 +1,33 @@
+{
+  "file": "dates.html",
+  "index": 0,
+  "note": "Start contains 15/05/2024, which can only be day-first, so 03/04/2024 is 3 April and 06/07/2024 is 6 July. Deadline contains nothing that settles it, so it keeps the month-first default and the column carries a warning saying so.",
+  "caption": "Milestones",
+  "width": 3,
+  "height": 4,
+  "headerRows": 1,
+  "columns": ["Event", "Start", "Deadline"],
+  "types": ["string", "date", "date"],
+  "sqlTypes": ["TEXT", "DATE", "DATE"],
+  "rectangle": [
+    ["Event", "Start", "Deadline"],
+    ["Kickoff", "03/04/2024", "01/02/2024"],
+    ["Review", "15/05/2024", "05/06/2024"],
+    ["Close", "06/07/2024", "07/08/2024"]
+  ],
+  "values": [
+    ["Kickoff", "2024-04-03", "2024-01-02"],
+    ["Review", "2024-05-15", "2024-05-06"],
+    ["Close", "2024-07-06", "2024-07-08"]
+  ],
+  "dayFirstValues": [
+    ["Kickoff", "2024-04-03", "2024-02-01"],
+    ["Review", "2024-05-15", "2024-06-05"],
+    ["Close", "2024-07-06", "2024-08-07"]
+  ],
+  "warningColumns": [1, 2],
+  "footRows": [],
+  "ragged": [],
+  "notes": [],
+  "isData": true
+}

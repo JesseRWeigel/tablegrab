@@ -1,0 +1,35 @@
+{
+  "file": "merged.html",
+  "index": 0,
+  "note": "Written out by hand from the HTML before the code was run against it. Region spans three rows then two, Revenue spans two columns over a second header row, and the tfoot is written before the tbody so it must come out last.",
+  "caption": "Regional revenue",
+  "width": 5,
+  "height": 8,
+  "headerRows": 2,
+  "columns": ["Region", "Country", "Revenue / 2023", "Revenue / 2024", "Reported"],
+  "labels": ["Region", "Country", "Revenue / 2023 (USD)", "Revenue / 2024 (USD)", "Reported"],
+  "types": ["string", "string", "number", "number", "date"],
+  "sqlTypes": ["TEXT", "TEXT", "INTEGER", "REAL", "DATE"],
+  "rectangle": [
+    ["Region", "Country", "Revenue", "Revenue", "Reported"],
+    ["Region", "Country", "2023", "2024", "Reported"],
+    ["North America", "Canada", "$1,234,567", "$1,301,004.50", "2024-01-15"],
+    ["North America", "United States", "$9,876,543", "$10,200,000", "15/02/2024"],
+    ["North America", "Mexico", "$450,000", "—", "3 March 2024"],
+    ["Europe", "France", "$2,000,000", "$2,150,000", "2024-04-01"],
+    ["Europe", "Germany", "$3,000,000", "$3,300,000", "May 6, 2024"],
+    ["Total", "Total", "$16,561,110", "$16,951,004.50", "2024-12-31"]
+  ],
+  "values": [
+    ["North America", "Canada", 1234567, 1301004.5, "2024-01-15"],
+    ["North America", "United States", 9876543, 10200000, "2024-02-15"],
+    ["North America", "Mexico", 450000, null, "2024-03-03"],
+    ["Europe", "France", 2000000, 2150000, "2024-04-01"],
+    ["Europe", "Germany", 3000000, 3300000, "2024-05-06"],
+    ["Total", "Total", 16561110, 16951004.5, "2024-12-31"]
+  ],
+  "footRows": [5],
+  "ragged": [],
+  "notes": [],
+  "isData": true
+}

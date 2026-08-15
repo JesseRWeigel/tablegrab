@@ -1,0 +1,27 @@
+{
+  "file": "overlap.html",
+  "index": 0,
+  "note": "Malformed. Ana's rowspan owns column 1 of row 2, and the colspan=3 cell in that row wants it too. The earlier cell keeps the slot, the overlap is recorded as a note, and the wide cell's text lands in the two columns it could still reach.",
+  "caption": "",
+  "width": 3,
+  "height": 4,
+  "headerRows": 1,
+  "columns": ["Stage", "Owner", "Notes"],
+  "types": ["string", "string", "string"],
+  "sqlTypes": ["TEXT", "TEXT", "TEXT"],
+  "rectangle": [
+    ["Stage", "Owner", "Notes"],
+    ["Draft", "Ana", "first pass"],
+    ["carried over from the previous quarter", "Ana", "carried over from the previous quarter"],
+    ["Review", "Bo", "second pass"]
+  ],
+  "values": [
+    ["Draft", "Ana", "first pass"],
+    ["carried over from the previous quarter", "Ana", "carried over from the previous quarter"],
+    ["Review", "Bo", "second pass"]
+  ],
+  "footRows": [],
+  "ragged": [],
+  "notes": ["row 2 col 1: overlapping spans, later cell dropped"],
+  "isData": true
+}
