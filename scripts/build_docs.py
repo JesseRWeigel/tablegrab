@@ -33,6 +33,8 @@ DEMOS = [
                                           "leading zero stay text. The money and percentages do not."),
     ("dates", "Ambiguous dates", "15/05/2024 can only be day-first, which settles the two beside "
                                  "it. The Deadline column has nothing to settle it and says so."),
+    ("messy", "Awkward cells", "A comma, a quote, an apostrophe, a script tag and two columns "
+                               "with the same name."),
     ("layout", "Not data", "Page furniture from the table-layout era, with a real data table "
                            "inside it. The outer two are refused."),
 ]
@@ -131,7 +133,7 @@ def table_blocks(html: str) -> list[str]:
 def expectations() -> list[dict]:
     """The hand-written answers, reshaped for the in-page check."""
     out = []
-    for name in ["merged", "ragged", "types", "dates", "overlap"]:
+    for name in ["merged", "ragged", "types", "dates", "messy", "overlap"]:
         want = json.loads(read(os.path.join(EXPECTED, f"{name}.json")))
         if name == "overlap":
             continue

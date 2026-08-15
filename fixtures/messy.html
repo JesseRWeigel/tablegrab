@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Messy cell fixture</title></head>
+<body>
+<p>Cells that break the output formats rather than the grid: a comma, a double quote, an
+apostrophe, a script tag, an entity, two block paragraphs in one cell, and two columns given
+the same name. Tags in capitals, because plenty of pages still are.</p>
+
+<table>
+  <CAPTION>Odd cells</CAPTION>
+  <TR><TH>Name</TH><TH>Note</TH><TH>Note</TH><TH>Count</TH></TR>
+  <tr>
+    <td>O'Brien</td>
+    <td>a, b<script>window.__grabDemo = 1;</script></td>
+    <td>say "hi"</td>
+    <td>1,000</td>
+  </tr>
+  <tr>
+    <td>Ada &amp; Co.</td>
+    <td><p>one</p><p>two</p></td>
+    <td>tab&#9;split</td>
+    <td>2,500</td>
+  </tr>
+</table>
+</body></html>

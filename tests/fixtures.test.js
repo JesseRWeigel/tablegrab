@@ -51,7 +51,8 @@ function sqlTypesOf(analysis) {
     .map((line) => line.trim().split(/\s+/).pop().replace(/,$/, ''));
 }
 
-for (const name of ['merged.json', 'ragged.json', 'types.json', 'dates.json', 'overlap.json']) {
+for (const name of ['merged.json', 'ragged.json', 'types.json', 'dates.json',
+  'overlap.json', 'messy.json']) {
   const want = expected(name);
   test(`${want.file}: the rectangle matches the hand-written answer`, () => {
     const { grid } = analysisOf(want.file, want.index);

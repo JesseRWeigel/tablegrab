@@ -1,0 +1,25 @@
+{
+  "file": "messy.html",
+  "index": 0,
+  "note": "Written out by hand. The second Note column has to be renamed, the script contents must never appear, and the comma, the quote and the apostrophe have to survive into every output format.",
+  "caption": "Odd cells",
+  "width": 4,
+  "height": 3,
+  "headerRows": 1,
+  "columns": ["Name", "Note", "Note_2", "Count"],
+  "types": ["string", "string", "string", "number"],
+  "sqlTypes": ["TEXT", "TEXT", "TEXT", "INTEGER"],
+  "rectangle": [
+    ["Name", "Note", "Note", "Count"],
+    ["O'Brien", "a, b", "say \"hi\"", "1,000"],
+    ["Ada & Co.", "one two", "tab split", "2,500"]
+  ],
+  "values": [
+    ["O'Brien", "a, b", "say \"hi\"", 1000],
+    ["Ada & Co.", "one two", "tab split", 2500]
+  ],
+  "footRows": [],
+  "ragged": [],
+  "notes": [],
+  "isData": true
+}
