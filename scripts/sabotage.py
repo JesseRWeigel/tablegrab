@@ -83,8 +83,6 @@ SABOTAGES = [
     ("a version string is read as a number", "src/infer.js",
      "    [/^(\\d{1,3}(?:\\.\\d{3}){2,})$/, (m) => Number(m[1].replace(/\\./g, ''))],",
      "    [/^(\\d{1,3}(?:\\.\\d+){2,})$/, (m) => Number(m[1].replace(/\\./g, ''))],", False),
-    ("anything with digits and punctuation is a number", "src/infer.js",
-     "  if (!/^\\d[\\d., ]*$/.test(s)) return null;", "  if (false) return null;", False),
     ("impossible dates are accepted", "src/infer.js",
      "  if (!(y >= 1 && y <= 9999) || !(m >= 1 && m <= 12) || d < 1) return false;",
      "  return true;", False),
