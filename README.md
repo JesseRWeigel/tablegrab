@@ -97,7 +97,7 @@ INDEPENDENT CHECK PASSED
    PASS
 
 == 6. privacy scan with planted controls
-  read 42 of 42 tracked files, both control credentials detected, a NUL byte file reported rather than skipped
+  read 45 of 45 tracked files, both control credentials detected, a NUL byte file reported rather than skipped
 PRIVACY SCAN PASSED
    PASS
 
@@ -131,7 +131,7 @@ PRIVACY SCAN PASSED
    PASS
 
 == 12. verify did not modify the tree it was verifying
-   42 tracked files unchanged
+   45 tracked files unchanged
    PASS
 
 VERIFY PASSED: tablegrab, 12 of 12 steps
