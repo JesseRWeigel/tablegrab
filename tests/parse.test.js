@@ -14,9 +14,9 @@ test('cells and rows close implicitly', () => {
   assert.deepStrictEqual(cells(table), [['a', 'b'], ['c', 'd']]);
 });
 
-test('inline markup inside a cell becomes a word break, not a join', () => {
+test('inline markup adds no space, the way a browser renders it', () => {
   const [table] = parseTables('<table><tr><td>Rail<sup>[1]</sup></td><td><b>bold</b>face</td></tr></table>');
-  assert.deepStrictEqual(cells(table), [['Rail [1]', 'bold face']]);
+  assert.deepStrictEqual(cells(table), [['Rail[1]', 'boldface']]);
 });
 
 test('entities are decoded and a non-breaking space becomes an ordinary one', () => {
@@ -92,4 +92,19 @@ test('collapse folds whitespace the way a browser does', () => {
 
 test('a document with no table yields nothing rather than throwing', () => {
   assert.deepStrictEqual(parseTables('<p>nothing here</p>'), []);
+});
+
+test('a block tag inside a cell separates words', () => {
+  const [table] = parseTables('<table><tr><td><p>one</p><p>two</p></td><td>a<br>b</td></tr></table>');
+  assert.deepStrictEqual(cells(table), [['one two', 'a b']]);
+});
+
+test('textFromHtml agrees with the tokenizer, which is what keeps the DOM path honest', () => {
+  const { textFromHtml } = require('../src/parse');
+  const bodies = ['Rail<sup>[1]</sup>', '<b>bold</b>face', '<p>one</p><p>two</p>', 'a<br>b',
+    '1&nbsp;435', '<img src="x.png" alt="flag"> Canada', 'keep<script>drop()</script>'];
+  for (const body of bodies) {
+    const [table] = parseTables(`<table><tr><td>${body}</td></tr></table>`);
+    assert.strictEqual(textFromHtml(body), table.rows[0].cells[0].text, body);
+  }
 });

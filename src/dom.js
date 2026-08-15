@@ -3,7 +3,7 @@
 
 'use strict';
 
-const { collapse } = require('./parse');
+const { collapse, textFromHtml } = require('./parse');
 
 function attrsOf(element) {
   const attrs = {};
@@ -42,12 +42,16 @@ function nearestTable(node) {
   return null;
 }
 
+// A nested table's cells belong to the nested table, so they are removed before the text is
+// read. The rest goes through the same flattener the string parser uses, rather than through
+// textContent, so that an inline tag and a block tag are treated the same way in both.
 function cellText(cell) {
   const clone = cell.cloneNode(true);
   const drop = clone.querySelectorAll ? clone.querySelectorAll('script,style,table') : [];
   for (let i = 0; i < drop.length; i += 1) {
     if (drop[i].parentNode) drop[i].parentNode.removeChild(drop[i]);
   }
+  if (typeof clone.innerHTML === 'string') return textFromHtml(clone.innerHTML);
   return collapse(clone.textContent || '');
 }
 

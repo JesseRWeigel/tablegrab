@@ -16,6 +16,15 @@ const VOID_TAGS = new Set([
   'param', 'source', 'track', 'wbr',
 ]);
 
+// Only these separate words. An inline tag does not: a browser renders `Rail<sup>[1]</sup>` as
+// "Rail[1]" with no space, and the two readers here have to agree with the browser and with
+// each other, because the same fixtures are checked through both.
+const BLOCK_TAGS = new Set([
+  'address', 'article', 'aside', 'blockquote', 'br', 'dd', 'div', 'dl', 'dt', 'figcaption',
+  'figure', 'footer', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hr', 'li', 'main', 'nav',
+  'ol', 'p', 'pre', 'section', 'table', 'td', 'th', 'tr', 'ul',
+]);
+
 const ENTITIES = {
   amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: '\u00a0', ndash: '–',
   mdash: '—', hellip: '…', pound: '£', euro: '€', yen: '¥',
@@ -147,10 +156,6 @@ function parseTables(html) {
       if (!/\/\s*$/.test(rest)) skipTag = name;
       continue;
     }
-    if (!closing && name === 'br') {
-      addText(' ');
-      continue;
-    }
 
     if (name === 'table') {
       if (!closing) {
@@ -227,11 +232,15 @@ function parseTables(html) {
       if (name === 'img' && !closing) {
         const attrs = parseAttributes(rest);
         if (attrs.alt) addText(' ' + attrs.alt + ' ');
+        continue;
       }
+      // br and hr are void and still break the line.
+      if (BLOCK_TAGS.has(name)) addText(' ');
       continue;
     }
-    // Any other tag, such as <a> or <sup>, contributes nothing but a possible word break.
-    addText(' ');
+    // Any other tag. A block level one separates words, an inline one such as <a> or <sup>
+    // does not, which is what the browser does when it lays the cell out.
+    if (BLOCK_TAGS.has(name)) addText(' ');
   }
   addText(source.slice(pending));
 
@@ -256,4 +265,23 @@ function parseTables(html) {
   return tables;
 }
 
-module.exports = { parseTables, collapse, decodeEntities, parseAttributes };
+// The text of one cell, given its inner HTML. The DOM adapter hands its cells through here so
+// that a cell reads the same whether it arrived as a string or as an element.
+function textFromHtml(html) {
+  const stripped = String(html)
+    .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, ' ')
+    .replace(/<!--[\s\S]*?-->/g, ' ');
+  const flattened = stripped.replace(
+    /<(\/?)([a-zA-Z][a-zA-Z0-9]*)((?:"[^"]*"|'[^']*'|[^>])*)>/g,
+    (whole, closing, name, rest) => {
+      const tag = name.toLowerCase();
+      if (tag === 'img' && !closing) {
+        const alt = parseAttributes(rest).alt;
+        return alt ? ` ${alt} ` : '';
+      }
+      return BLOCK_TAGS.has(tag) ? ' ' : '';
+    });
+  return collapse(flattened);
+}
+
+module.exports = { parseTables, collapse, decodeEntities, parseAttributes, textFromHtml, BLOCK_TAGS };

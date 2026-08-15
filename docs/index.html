@@ -1,0 +1,1640 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>tablegrab</title>
+<meta name="description" content="A bookmarklet that turns any HTML table into CSV, JSON, Markdown or SQL.">
+<style>
+:root{color-scheme:light dark;--bg:#fbfaf8;--fg:#191a1c;--muted:#5d626a;--line:#e4e5e8;
+  --card:#fff;--accent:#b23a22}
+@media (prefers-color-scheme:dark){:root{--bg:#131416;--fg:#e9e7e3;--muted:#8f959d;
+  --line:#25282c;--card:#191b1e;--accent:#e2755a}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);
+  font:16px/1.6 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+main{max-width:54rem;margin:0 auto;padding:3rem 1.25rem 4rem}
+h1{font-size:clamp(1.9rem,5vw,2.6rem);margin:0 0 .3rem;letter-spacing:-.03em}
+h2{font-size:1.12rem;margin:2.4rem 0 .7rem;padding-bottom:.35rem;border-bottom:1px solid var(--line)}
+h3{font-size:.95rem;margin:1.6rem 0 .3rem}
+p{color:var(--muted);max-width:44rem}
+a{color:var(--accent)}
+.grab{display:inline-block;border:1px solid var(--line);background:var(--card);color:var(--fg);
+  border-radius:6px;padding:.35rem .8rem;font-weight:600;text-decoration:none}
+button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--fg);
+  border-radius:6px;padding:.35rem .8rem;cursor:pointer}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--card)}
+table{border-collapse:collapse;font-size:.86rem;min-width:100%}
+th,td{text-align:left;padding:.35rem .6rem;border:1px solid var(--line);vertical-align:top;
+  white-space:nowrap}
+caption{text-align:left;padding:.4rem .6rem;color:var(--muted);font-size:.8rem}
+pre{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:.9rem;
+  overflow-x:auto;font-size:.8rem;line-height:1.5}
+code{background:var(--card);border:1px solid var(--line);border-radius:3px;padding:.05rem .3rem;
+  font-size:.85em}
+footer{margin-top:3rem;color:var(--muted);font-size:.85rem}
+</style></head><body><main>
+
+<h1>tablegrab</h1>
+<p>Drag this to your bookmarks bar, then click it on any page with a table. Hover to highlight,
+click to export.</p>
+<p><a class="grab" href="javascript:(function(){(function(global){%0Avar%20__defs%20=%20{},%20__cache%20=%20{};%0Afunction%20require(name){%0A%20%20var%20key%20=%20String(name).replace(/^\.\//,%20'');%0A%20%20if%20(__cache[key])%20return%20__cache[key].exports;%0A%20%20if%20(!__defs[key])%20throw%20new%20Error('tablegrab:%20no%20module%20'%20+%20key);%0A%20%20var%20module%20=%20{%20exports:%20{}%20};%0A%20%20__cache[key]%20=%20module;%0A%20%20__defs[key](module,%20module.exports,%20require);%0A%20%20return%20module.exports;%0A}%0A__defs['parse']%20=%20function(module,%20exports,%20require){%0A//%20A%20tolerant%20HTML%20table%20reader.%0A//%0A//%20The%20browser%20has%20a%20parser%20already,%20so%20this%20exists%20for%20node:%20the%20CLI,%20the%20tests%20and%20the%0A//%20fixtures%20all%20need%20the%20same%20cell%20structure%20the%20DOM%20adapter%20produces.%20It%20reads%20tags%20with%20a%0A//%20scanner%20rather%20than%20building%20a%20full%20document%20tree,%20because%20the%20only%20structure%20that%20matters%0A//%20here%20is%20table%20/%20caption%20/%20section%20/%20row%20/%20cell.%0A//%0A//%20Implicit%20closes%20are%20the%20whole%20difficulty.%20Real%20pages,%20and%20Wikipedia%20in%20particular,%20write%0A//%20%60%3Ctr%3E%3Ctd%3Ea%3Ctd%3Eb%60%20with%20no%20closing%20tags%20at%20all,%20so%20a%20cell%20ends%20when%20the%20next%20cell,%20row,%0A//%20section%20or%20table%20starts.%0A%0A'use%20strict';%0A%0Aconst%20VOID_TAGS%20=%20new%20Set([%0A%20%20'area',%20'base',%20'br',%20'col',%20'embed',%20'hr',%20'img',%20'input',%20'link',%20'meta',%0A%20%20'param',%20'source',%20'track',%20'wbr',%0A]);%0A%0A//%20Only%20these%20separate%20words.%20An%20inline%20tag%20does%20not:%20a%20browser%20renders%20%60Rail%3Csup%3E[1]%3C/sup%3E%60%20as%0A//%20%22Rail[1]%22%20with%20no%20space,%20and%20the%20two%20readers%20here%20have%20to%20agree%20with%20the%20browser%20and%20with%0A//%20each%20other,%20because%20the%20same%20fixtures%20are%20checked%20through%20both.%0Aconst%20BLOCK_TAGS%20=%20new%20Set([%0A%20%20'address',%20'article',%20'aside',%20'blockquote',%20'br',%20'dd',%20'div',%20'dl',%20'dt',%20'figcaption',%0A%20%20'figure',%20'footer',%20'h1',%20'h2',%20'h3',%20'h4',%20'h5',%20'h6',%20'header',%20'hr',%20'li',%20'main',%20'nav',%0A%20%20'ol',%20'p',%20'pre',%20'section',%20'table',%20'td',%20'th',%20'tr',%20'ul',%0A]);%0A%0Aconst%20ENTITIES%20=%20{%0A%20%20amp:%20'&',%20lt:%20'%3C',%20gt:%20'%3E',%20quot:%20'%22',%20apos:%20%22'%22,%20nbsp:%20'\u00a0',%20ndash:%20'%E2%80%93',%0A%20%20mdash:%20'%E2%80%94',%20hellip:%20'%E2%80%A6',%20pound:%20'%C2%A3',%20euro:%20'%E2%82%AC',%20yen:%20'%C2%A5',%0A%20%20cent:%20'%C2%A2',%20deg:%20'%C2%B0',%20times:%20'%C3%97',%20minus:%20'%E2%88%92',%20laquo:%20'%C2%AB',%0A%20%20raquo:%20'%C2%BB',%20lsquo:%20'%E2%80%98',%20rsquo:%20'%E2%80%99',%20ldquo:%20'%E2%80%9C',%20rdquo:%20'%E2%80%9D',%0A%20%20bull:%20'%E2%80%A2',%20dagger:%20'%E2%80%A0',%20copy:%20'%C2%A9',%20reg:%20'%C2%AE',%20trade:%20'%E2%84%A2',%0A%20%20frac12:%20'%C2%BD',%20frac14:%20'%C2%BC',%20sup2:%20'%C2%B2',%20sup3:%20'%C2%B3',%0A};%0A%0Afunction%20decodeEntities(text)%20{%0A%20%20return%20text.replace(/&(%23x[0-9a-fA-F]+|%23\d+|[a-zA-Z][a-zA-Z0-9]*);/g,%20(whole,%20body)%20=%3E%20{%0A%20%20%20%20if%20(body[0]%20===%20'%23')%20{%0A%20%20%20%20%20%20const%20code%20=%20body[1]%20===%20'x'%20||%20body[1]%20===%20'X'%0A%20%20%20%20%20%20%20%20?%20parseInt(body.slice(2),%2016)%0A%20%20%20%20%20%20%20%20:%20parseInt(body.slice(1),%2010);%0A%20%20%20%20%20%20if%20(!Number.isFinite(code)%20||%20code%20%3C%201%20||%20code%20%3E%200x10ffff)%20return%20whole;%0A%20%20%20%20%20%20try%20{%0A%20%20%20%20%20%20%20%20return%20String.fromCodePoint(code);%0A%20%20%20%20%20%20}%20catch%20(err)%20{%0A%20%20%20%20%20%20%20%20return%20whole;%0A%20%20%20%20%20%20}%0A%20%20%20%20}%0A%20%20%20%20const%20key%20=%20body.toLowerCase();%0A%20%20%20%20return%20Object.prototype.hasOwnProperty.call(ENTITIES,%20key)%20?%20ENTITIES[key]%20:%20whole;%0A%20%20});%0A}%0A%0A//%20Collapse%20the%20way%20a%20browser%20lays%20text%20out:%20runs%20of%20whitespace%20become%20one%20space,%20and%20a%0A//%20non-breaking%20space%20becomes%20an%20ordinary%20one%20so%20that%20%221%20234%22%20written%20with%20&nbsp;%20is%20still%0A//%20readable%20as%20a%20number%20later.%0Afunction%20collapse(text)%20{%0A%20%20return%20decodeEntities(text)%0A%20%20%20%20.replace(/\u00a0/g,%20'%20')%0A%20%20%20%20.replace(/\s+/g,%20'%20')%0A%20%20%20%20.trim();%0A}%0A%0Afunction%20parseAttributes(source)%20{%0A%20%20const%20attrs%20=%20{};%0A%20%20const%20pattern%20=%20/([a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*(?:=\s*(%22[^%22]*%22|'[^']*'|[^\s%22'%3E]+))?/g;%0A%20%20let%20match;%0A%20%20while%20((match%20=%20pattern.exec(source))%20!==%20null)%20{%0A%20%20%20%20let%20value%20=%20match[2]%20===%20undefined%20?%20''%20:%20match[2];%0A%20%20%20%20if%20(value.length%20%3E%201%20&&%20(value[0]%20===%20'%22'%20||%20value[0]%20===%20%22'%22))%20value%20=%20value.slice(1,%20-1);%0A%20%20%20%20attrs[match[1].toLowerCase()]%20=%20decodeEntities(value);%0A%20%20}%0A%20%20return%20attrs;%0A}%0A%0Afunction%20spanOf(attrs,%20name)%20{%0A%20%20const%20raw%20=%20attrs[name];%0A%20%20if%20(raw%20===%20undefined)%20return%201;%0A%20%20const%20digits%20=%20String(raw).match(/\d+/);%0A%20%20if%20(!digits)%20return%201;%0A%20%20const%20value%20=%20parseInt(digits[0],%2010);%0A%20%20//%20rowspan=0%20means%20%22to%20the%20end%20of%20this%20section%22%20and%20is%20handled%20by%20the%20grid%20builder.%0A%20%20//%20colspan=0%20was%20dropped%20from%20HTML%20and%20is%20treated%20as%201.%0A%20%20if%20(!Number.isFinite(value)%20||%20value%20%3C%200)%20return%201;%0A%20%20if%20(value%20%3E%201000)%20return%201000;%0A%20%20return%20value;%0A}%0A%0Afunction%20newTable(attrs,%20depth)%20{%0A%20%20return%20{%0A%20%20%20%20attrs,%0A%20%20%20%20depth,%0A%20%20%20%20caption:%20'',%0A%20%20%20%20rows:%20[],%0A%20%20%20%20hasNestedTable:%20false,%0A%20%20%20%20thCount:%200,%0A%20%20%20%20tdCount:%200,%0A%20%20%20%20hasExplicitHead:%20false,%0A%20%20};%0A}%0A%0A//%20Returns%20every%20table%20in%20the%20document,%20outermost%20first,%20each%20with%20its%20own%20cells%20only.%0A//%20A%20cell%20that%20itself%20contains%20a%20table%20keeps%20its%20text%20but%20the%20inner%20table%20is%20a%20separate%20entry.%0Afunction%20parseTables(html)%20{%0A%20%20const%20source%20=%20String(html).replace(/%3C!--[\s\S]*?--%3E/g,%20'');%0A%20%20const%20tables%20=%20[];%0A%20%20const%20stack%20=%20[];%0A%20%20let%20skipTag%20=%20null;%0A%20%20let%20captionOpen%20=%20false;%0A%20%20let%20pending%20=%200;%0A%0A%20%20const%20top%20=%20()%20=%3E%20(stack.length%20?%20stack[stack.length%20-%201]%20:%20null);%0A%0A%20%20function%20closeCell()%20{%0A%20%20%20%20const%20table%20=%20top();%0A%20%20%20%20if%20(!table%20||%20!table.openCell)%20return;%0A%20%20%20%20table.openCell.text%20=%20collapse(table.openCell.raw);%0A%20%20%20%20delete%20table.openCell.raw;%0A%20%20%20%20table.openCell%20=%20null;%0A%20%20}%0A%0A%20%20function%20closeRow()%20{%0A%20%20%20%20const%20table%20=%20top();%0A%20%20%20%20if%20(!table)%20return;%0A%20%20%20%20closeCell();%0A%20%20%20%20table.openRow%20=%20null;%0A%20%20}%0A%0A%20%20function%20addText(text)%20{%0A%20%20%20%20if%20(skipTag%20||%20!text)%20return;%0A%20%20%20%20const%20table%20=%20top();%0A%20%20%20%20if%20(!table)%20return;%0A%20%20%20%20if%20(captionOpen)%20{%0A%20%20%20%20%20%20table.caption%20+=%20text;%0A%20%20%20%20%20%20return;%0A%20%20%20%20}%0A%20%20%20%20if%20(table.openCell)%20table.openCell.raw%20+=%20text;%0A%20%20}%0A%0A%20%20const%20tagPattern%20=%20/%3C(\/?)([a-zA-Z][a-zA-Z0-9]*)((?:%22[^%22]*%22|'[^']*'|[^%3E])*)%3E/g;%0A%20%20let%20match;%0A%20%20while%20((match%20=%20tagPattern.exec(source))%20!==%20null)%20{%0A%20%20%20%20addText(source.slice(pending,%20match.index));%0A%20%20%20%20pending%20=%20tagPattern.lastIndex;%0A%0A%20%20%20%20const%20closing%20=%20match[1]%20===%20'/';%0A%20%20%20%20const%20name%20=%20match[2].toLowerCase();%0A%20%20%20%20const%20rest%20=%20match[3]%20||%20'';%0A%0A%20%20%20%20if%20(skipTag)%20{%0A%20%20%20%20%20%20if%20(closing%20&&%20name%20===%20skipTag)%20skipTag%20=%20null;%0A%20%20%20%20%20%20continue;%0A%20%20%20%20}%0A%20%20%20%20if%20(!closing%20&&%20(name%20===%20'script'%20||%20name%20===%20'style'))%20{%0A%20%20%20%20%20%20if%20(!/\/\s*$/.test(rest))%20skipTag%20=%20name;%0A%20%20%20%20%20%20continue;%0A%20%20%20%20}%0A%0A%20%20%20%20if%20(name%20===%20'table')%20{%0A%20%20%20%20%20%20if%20(!closing)%20{%0A%20%20%20%20%20%20%20%20const%20parent%20=%20top();%0A%20%20%20%20%20%20%20%20if%20(parent)%20{%0A%20%20%20%20%20%20%20%20%20%20parent.hasNestedTable%20=%20true;%0A%20%20%20%20%20%20%20%20%20%20if%20(parent.openCell)%20parent.openCell.hasNestedTable%20=%20true;%0A%20%20%20%20%20%20%20%20}%0A%20%20%20%20%20%20%20%20const%20table%20=%20newTable(parseAttributes(rest),%20stack.length);%0A%20%20%20%20%20%20%20%20table.openRow%20=%20null;%0A%20%20%20%20%20%20%20%20table.openCell%20=%20null;%0A%20%20%20%20%20%20%20%20table.section%20=%20null;%0A%20%20%20%20%20%20%20%20tables.push(table);%0A%20%20%20%20%20%20%20%20stack.push(table);%0A%20%20%20%20%20%20}%20else%20if%20(stack.length)%20{%0A%20%20%20%20%20%20%20%20closeRow();%0A%20%20%20%20%20%20%20%20captionOpen%20=%20false;%0A%20%20%20%20%20%20%20%20stack.pop();%0A%20%20%20%20%20%20}%0A%20%20%20%20%20%20continue;%0A%20%20%20%20}%0A%0A%20%20%20%20const%20table%20=%20top();%0A%20%20%20%20if%20(!table)%20continue;%0A%0A%20%20%20%20if%20(name%20===%20'caption')%20{%0A%20%20%20%20%20%20if%20(closing)%20captionOpen%20=%20false;%0A%20%20%20%20%20%20else%20{%0A%20%20%20%20%20%20%20%20closeCell();%0A%20%20%20%20%20%20%20%20captionOpen%20=%20true;%0A%20%20%20%20%20%20}%0A%20%20%20%20%20%20continue;%0A%20%20%20%20}%0A%20%20%20%20if%20(name%20===%20'thead'%20||%20name%20===%20'tbody'%20||%20name%20===%20'tfoot')%20{%0A%20%20%20%20%20%20closeRow();%0A%20%20%20%20%20%20table.section%20=%20closing%20?%20null%20:%20name;%0A%20%20%20%20%20%20if%20(!closing%20&&%20name%20===%20'thead')%20table.hasExplicitHead%20=%20true;%0A%20%20%20%20%20%20continue;%0A%20%20%20%20}%0A%20%20%20%20if%20(name%20===%20'tr')%20{%0A%20%20%20%20%20%20closeRow();%0A%20%20%20%20%20%20if%20(!closing)%20{%0A%20%20%20%20%20%20%20%20table.openRow%20=%20{%20cells:%20[],%20section:%20table.section%20||%20'tbody'%20};%0A%20%20%20%20%20%20%20%20table.rows.push(table.openRow);%0A%20%20%20%20%20%20}%0A%20%20%20%20%20%20continue;%0A%20%20%20%20}%0A%20%20%20%20if%20(name%20===%20'th'%20||%20name%20===%20'td')%20{%0A%20%20%20%20%20%20closeCell();%0A%20%20%20%20%20%20if%20(closing)%20continue;%0A%20%20%20%20%20%20if%20(!table.openRow)%20{%0A%20%20%20%20%20%20%20%20table.openRow%20=%20{%20cells:%20[],%20section:%20table.section%20||%20'tbody'%20};%0A%20%20%20%20%20%20%20%20table.rows.push(table.openRow);%0A%20%20%20%20%20%20}%0A%20%20%20%20%20%20const%20attrs%20=%20parseAttributes(rest);%0A%20%20%20%20%20%20const%20cell%20=%20{%0A%20%20%20%20%20%20%20%20tag:%20name,%0A%20%20%20%20%20%20%20%20header:%20name%20===%20'th',%0A%20%20%20%20%20%20%20%20colspan:%20Math.max(1,%20spanOf(attrs,%20'colspan')),%0A%20%20%20%20%20%20%20%20rowspan:%20spanOf(attrs,%20'rowspan'),%0A%20%20%20%20%20%20%20%20attrs,%0A%20%20%20%20%20%20%20%20raw:%20'',%0A%20%20%20%20%20%20%20%20text:%20'',%0A%20%20%20%20%20%20%20%20hasNestedTable:%20false,%0A%20%20%20%20%20%20};%0A%20%20%20%20%20%20if%20(name%20===%20'th')%20table.thCount%20+=%201;%0A%20%20%20%20%20%20else%20table.tdCount%20+=%201;%0A%20%20%20%20%20%20table.openRow.cells.push(cell);%0A%20%20%20%20%20%20table.openCell%20=%20cell;%0A%20%20%20%20%20%20continue;%0A%20%20%20%20}%0A%20%20%20%20if%20(VOID_TAGS.has(name))%20{%0A%20%20%20%20%20%20//%20An%20image%20or%20an%20input%20inside%20a%20cell%20carries%20no%20text.%20Its%20alt%20text%20is%20worth%20keeping.%0A%20%20%20%20%20%20if%20(name%20===%20'img'%20&&%20!closing)%20{%0A%20%20%20%20%20%20%20%20const%20attrs%20=%20parseAttributes(rest);%0A%20%20%20%20%20%20%20%20if%20(attrs.alt)%20addText('%20'%20+%20attrs.alt%20+%20'%20');%0A%20%20%20%20%20%20%20%20continue;%0A%20%20%20%20%20%20}%0A%20%20%20%20%20%20//%20br%20and%20hr%20are%20void%20and%20still%20break%20the%20line.%0A%20%20%20%20%20%20if%20(BLOCK_TAGS.has(name))%20addText('%20');%0A%20%20%20%20%20%20continue;%0A%20%20%20%20}%0A%20%20%20%20//%20Any%20other%20tag.%20A%20block%20level%20one%20separates%20words,%20an%20inline%20one%20such%20as%20%3Ca%3E%20or%20%3Csup%3E%0A%20%20%20%20//%20does%20not,%20which%20is%20what%20the%20browser%20does%20when%20it%20lays%20the%20cell%20out.%0A%20%20%20%20if%20(BLOCK_TAGS.has(name))%20addText('%20');%0A%20%20}%0A%20%20addText(source.slice(pending));%0A%0A%20%20for%20(const%20table%20of%20tables)%20{%0A%20%20%20%20if%20(table.openCell)%20{%0A%20%20%20%20%20%20table.openCell.text%20=%20collapse(table.openCell.raw);%0A%20%20%20%20%20%20delete%20table.openCell.raw;%0A%20%20%20%20}%0A%20%20%20%20delete%20table.openCell;%0A%20%20%20%20delete%20table.openRow;%0A%20%20%20%20delete%20table.section;%0A%20%20%20%20table.caption%20=%20collapse(table.caption);%0A%20%20%20%20for%20(const%20row%20of%20table.rows)%20{%0A%20%20%20%20%20%20for%20(const%20cell%20of%20row.cells)%20{%0A%20%20%20%20%20%20%20%20if%20(cell.raw%20!==%20undefined)%20{%0A%20%20%20%20%20%20%20%20%20%20cell.text%20=%20collapse(cell.raw);%0A%20%20%20%20%20%20%20%20%20%20delete%20cell.raw;%0A%20%20%20%20%20%20%20%20}%0A%20%20%20%20%20%20}%0A%20%20%20%20}%0A%20%20}%0A%20%20return%20tables;%0A}%0A%0A//%20The%20text%20of%20one%20cell,%20given%20its%20inner%20HTML.%20The%20DOM%20adapter%20hands%20its%20cells%20through%20here%20so%0A//%20that%20a%20cell%20reads%20the%20same%20whether%20it%20arrived%20as%20a%20string%20or%20as%20an%20element.%0Afunction%20textFromHtml(html)%20{%0A%20%20const%20stripped%20=%20String(html)%0A%20%20%20%20.replace(/%3C(script|style)\b[^%3E]*%3E[\s\S]*?%3C\/\1\s*%3E/gi,%20'%20')%0A%20%20%20%20.replace(/%3C!--[\s\S]*?--%3E/g,%20'%20');%0A%20%20const%20flattened%20=%20stripped.replace(%0A%20%20%20%20/%3C(\/?)([a-zA-Z][a-zA-Z0-9]*)((?:%22[^%22]*%22|'[^']*'|[^%3E])*)%3E/g,%0A%20%20%20%20(whole,%20closing,%20name,%20rest)%20=%3E%20{%0A%20%20%20%20%20%20const%20tag%20=%20name.toLowerCase();%0A%20%20%20%20%20%20if%20(tag%20===%20'img'%20&&%20!closing)%20{%0A%20%20%20%20%20%20%20%20const%20alt%20=%20parseAttributes(rest).alt;%0A%20%20%20%20%20%20%20%20return%20alt%20?%20%60%20${alt}%20%60%20:%20'';%0A%20%20%20%20%20%20}%0A%20%20%20%20%20%20return%20BLOCK_TAGS.has(tag)%20?%20'%20'%20:%20'';%0A%20%20%20%20});%0A%20%20return%20collapse(flattened);%0A}%0A%0Amodule.exports%20=%20{%20parseTables,%20collapse,%20decodeEntities,%20parseAttributes,%20textFromHtml,%20BLOCK_TAGS%20};%0A%0A};%0A__defs['grid']%20=%20function(module,%20exports,%20require){%0A//%20Turn%20a%20parsed%20table%20into%20a%20rectangle.%0A//%0A//%20This%20is%20the%20part%20that%20is%20actually%20hard.%20A%20table%20with%20colspan%20and%20rowspan%20is%20a%20sparse%0A//%20description%20of%20a%20grid,%20and%20every%20consumer%20downstream%20wants%20the%20dense%20one.%20The%20rules%20here%0A//%20follow%20how%20a%20browser%20lays%20a%20table%20out:%0A//%0A//%20%20%20*%20cells%20are%20placed%20left%20to%20right%20into%20the%20first%20free%20slot%20on%20their%20row,%0A//%20%20%20*%20a%20cell%20with%20rowspan%20occupies%20the%20slot%20in%20later%20rows%20too,%20so%20the%20row%20below%20starts%0A//%20%20%20%20%20further%20right%20than%20its%20own%20cell%20count%20suggests,%0A//%20%20%20*%20rowspan=%220%22%20runs%20to%20the%20end%20of%20its%20section,%0A//%20%20%20*%20sections%20render%20thead,%20then%20tbody,%20then%20tfoot,%20whatever%20order%20they%20were%20written%20in,%0A//%20%20%20*%20a%20row%20with%20too%20few%20cells%20leaves%20the%20tail%20of%20the%20rectangle%20empty%20rather%20than%20shifting.%0A//%0A//%20A%20merged%20cell's%20text%20is%20repeated%20into%20every%20slot%20it%20covers.%20That%20is%20the%20useful%20answer%20for%0A//%20CSV%20and%20SQL,%20and%20the%20slot%20records%20whether%20it%20was%20the%20anchor%20so%20nothing%20has%20to%20guess%20later.%0A%0A'use%20strict';%0A%0Aconst%20SECTION_ORDER%20=%20{%20thead:%200,%20tbody:%201,%20tfoot:%202%20};%0A%0Afunction%20orderRows(table)%20{%0A%20%20const%20numbered%20=%20table.rows.map((row,%20index)%20=%3E%20({%20row,%20index%20}));%0A%20%20numbered.sort((a,%20b)%20=%3E%20{%0A%20%20%20%20const%20left%20=%20SECTION_ORDER[a.row.section]%20===%20undefined%20?%201%20:%20SECTION_ORDER[a.row.section];%0A%20%20%20%20const%20right%20=%20SECTION_ORDER[b.row.section]%20===%20undefined%20?%201%20:%20SECTION_ORDER[b.row.section];%0A%20%20%20%20if%20(left%20!==%20right)%20return%20left%20-%20right;%0A%20%20%20%20return%20a.index%20-%20b.index;%0A%20%20});%0A%20%20return%20numbered.map((entry)%20=%3E%20entry.row);%0A}%0A%0Afunction%20sectionEnd(rows,%20start)%20{%0A%20%20const%20section%20=%20rows[start].section;%0A%20%20let%20end%20=%20start;%0A%20%20while%20(end%20+%201%20%3C%20rows.length%20&&%20rows[end%20+%201].section%20===%20section)%20end%20+=%201;%0A%20%20return%20end;%0A}%0A%0Afunction%20buildSlots(rows)%20{%0A%20%20const%20slots%20=%20[];%0A%20%20const%20notes%20=%20[];%0A%20%20const%20ensure%20=%20(r)%20=%3E%20{%0A%20%20%20%20while%20(slots.length%20%3C=%20r)%20slots.push([]);%0A%20%20%20%20return%20slots[r];%0A%20%20};%0A%0A%20%20for%20(let%20r%20=%200;%20r%20%3C%20rows.length;%20r%20+=%201)%20{%0A%20%20%20%20const%20row%20=%20rows[r];%0A%20%20%20%20ensure(r);%0A%20%20%20%20let%20c%20=%200;%0A%20%20%20%20for%20(const%20cell%20of%20row.cells)%20{%0A%20%20%20%20%20%20while%20(slots[r][c]%20!==%20undefined)%20c%20+=%201;%0A%20%20%20%20%20%20let%20rowspan%20=%20cell.rowspan;%0A%20%20%20%20%20%20if%20(rowspan%20===%200)%20{%0A%20%20%20%20%20%20%20%20rowspan%20=%20sectionEnd(rows,%20r)%20-%20r%20+%201;%0A%20%20%20%20%20%20%20%20notes.push(%60row%20${r}%20col%20${c}:%20rowspan=%220%22%20expanded%20to%20${rowspan}%20rows%60);%0A%20%20%20%20%20%20}%0A%20%20%20%20%20%20rowspan%20=%20Math.max(1,%20Math.min(rowspan,%20rows.length%20-%20r));%0A%20%20%20%20%20%20const%20colspan%20=%20Math.max(1,%20cell.colspan);%0A%20%20%20%20%20%20for%20(let%20dr%20=%200;%20dr%20%3C%20rowspan;%20dr%20+=%201)%20{%0A%20%20%20%20%20%20%20%20const%20target%20=%20ensure(r%20+%20dr);%0A%20%20%20%20%20%20%20%20for%20(let%20dc%20=%200;%20dc%20%3C%20colspan;%20dc%20+=%201)%20{%0A%20%20%20%20%20%20%20%20%20%20if%20(target[c%20+%20dc]%20!==%20undefined)%20{%0A%20%20%20%20%20%20%20%20%20%20%20%20notes.push(%60row%20${r%20+%20dr}%20col%20${c%20+%20dc}:%20overlapping%20spans,%20later%20cell%20dropped%60);%0A%20%20%20%20%20%20%20%20%20%20%20%20continue;%0A%20%20%20%20%20%20%20%20%20%20}%0A%20%20%20%20%20%20%20%20%20%20target[c%20+%20dc]%20=%20{%0A%20%20%20%20%20%20%20%20%20%20%20%20text:%20cell.text,%0A%20%20%20%20%20%20%20%20%20%20%20%20header:%20cell.header,%0A%20%20%20%20%20%20%20%20%20%20%20%20anchor:%20dr%20===%200%20&&%20dc%20===%200,%0A%20%20%20%20%20%20%20%20%20%20%20%20anchorRow:%20r,%0A%20%20%20%20%20%20%20%20%20%20%20%20anchorCol:%20c,%0A%20%20%20%20%20%20%20%20%20%20%20%20rowspan,%0A%20%20%20%20%20%20%20%20%20%20%20%20colspan,%0A%20%20%20%20%20%20%20%20%20%20%20%20merged:%20rowspan%20%3E%201%20||%20colspan%20%3E%201,%0A%20%20%20%20%20%20%20%20%20%20%20%20hasNestedTable:%20!!cell.hasNestedTable,%0A%20%20%20%20%20%20%20%20%20%20};%0A%20%20%20%20%20%20%20%20}%0A%20%20%20%20%20%20}%0A%20%20%20%20%20%20c%20+=%20colspan;%0A%20%20%20%20}%0A%20%20}%0A%0A%20%20let%20width%20=%200;%0A%20%20for%20(const%20row%20of%20slots)%20width%20=%20Math.max(width,%20row.length);%0A%20%20const%20ragged%20=%20[];%0A%20%20for%20(let%20r%20=%200;%20r%20%3C%20slots.length;%20r%20+=%201)%20{%0A%20%20%20%20let%20filled%20=%200;%0A%20%20%20%20for%20(let%20c%20=%200;%20c%20%3C%20width;%20c%20+=%201)%20{%0A%20%20%20%20%20%20if%20(slots[r][c]%20===%20undefined)%20{%0A%20%20%20%20%20%20%20%20slots[r][c]%20=%20{%0A%20%20%20%20%20%20%20%20%20%20text:%20'',%20header:%20false,%20anchor:%20true,%20anchorRow:%20r,%20anchorCol:%20c,%0A%20%20%20%20%20%20%20%20%20%20rowspan:%201,%20colspan:%201,%20merged:%20false,%20filler:%20true,%20hasNestedTable:%20false,%0A%20%20%20%20%20%20%20%20};%0A%20%20%20%20%20%20}%20else%20{%0A%20%20%20%20%20%20%20%20filled%20+=%201;%0A%20%20%20%20%20%20}%0A%20%20%20%20}%0A%20%20%20%20if%20(filled%20%3C%20width)%20ragged.push({%20row:%20r,%20filled,%20width%20});%0A%20%20}%0A%20%20return%20{%20slots,%20width,%20ragged,%20notes%20};%0A}%0A%0A//%20How%20many%20rows%20at%20the%20top%20are%20header%20rows.%20An%20explicit%20thead%20wins.%20Without%20one,%20a%20leading%20run%0A//%20of%20rows%20whose%20anchor%20cells%20are%20all%20th%20counts,%20which%20is%20what%20a%20hand-written%20table%20does.%0Afunction%20headerRowCount(rows,%20slots)%20{%0A%20%20let%20explicit%20=%200;%0A%20%20while%20(explicit%20%3C%20rows.length%20&&%20rows[explicit].section%20===%20'thead')%20explicit%20+=%201;%0A%20%20if%20(explicit%20%3E%200)%20return%20explicit;%0A%20%20let%20count%20=%200;%0A%20%20for%20(let%20r%20=%200;%20r%20%3C%20slots.length;%20r%20+=%201)%20{%0A%20%20%20%20const%20anchors%20=%20slots[r].filter((slot)%20=%3E%20slot.anchor%20&&%20!slot.filler);%0A%20%20%20%20if%20(anchors.length%20===%200)%20break;%0A%20%20%20%20if%20(!anchors.every((slot)%20=%3E%20slot.header))%20break;%0A%20%20%20%20count%20+=%201;%0A%20%20}%0A%20%20//%20Every%20row%20being%20a%20header%20usually%20means%20a%20grid%20of%20labels%20rather%20than%20a%20header%20block%20that%0A%20%20//%20deep,%20so%20only%20the%20first%20row%20is%20taken%20as%20the%20header%20and%20the%20rest%20become%20data.%0A%20%20if%20(count%20===%20slots.length%20&&%20slots.length%20%3E%201)%20return%201;%0A%20%20return%20count;%0A}%0A%0Afunction%20uniquify(names)%20{%0A%20%20const%20seen%20=%20new%20Map();%0A%20%20return%20names.map((name)%20=%3E%20{%0A%20%20%20%20const%20count%20=%20seen.get(name)%20||%200;%0A%20%20%20%20seen.set(name,%20count%20+%201);%0A%20%20%20%20return%20count%20===%200%20?%20name%20:%20%60${name}_${count%20+%201}%60;%0A%20%20});%0A}%0A%0A//%20Collapse%20a%20stack%20of%20header%20rows%20into%20one%20name%20per%20column.%20A%20header%20spanning%20two%20columns%0A//%20repeats%20into%20both,%20so%20%22Sales%22%20over%20%222023%22%20and%20%222024%22%20becomes%20%22Sales%20/%202023%22%20and%0A//%20%22Sales%20/%202024%22.%20A%20header%20spanning%20two%20rows%20repeats%20downward,%20and%20repeating%20a%20name%20into%0A//%20itself%20is%20noise,%20so%20consecutive%20duplicates%20collapse.%0Afunction%20columnNames(slots,%20headerRows,%20width,%20separator)%20{%0A%20%20const%20names%20=%20[];%0A%20%20for%20(let%20c%20=%200;%20c%20%3C%20width;%20c%20+=%201)%20{%0A%20%20%20%20const%20parts%20=%20[];%0A%20%20%20%20for%20(let%20r%20=%200;%20r%20%3C%20headerRows;%20r%20+=%201)%20{%0A%20%20%20%20%20%20const%20slot%20=%20slots[r]%20&&%20slots[r][c];%0A%20%20%20%20%20%20const%20text%20=%20slot%20&&%20slot.text%20?%20slot.text.trim()%20:%20'';%0A%20%20%20%20%20%20if%20(!text)%20continue;%0A%20%20%20%20%20%20if%20(parts.length%20&&%20parts[parts.length%20-%201]%20===%20text)%20continue;%0A%20%20%20%20%20%20parts.push(text);%0A%20%20%20%20}%0A%20%20%20%20names.push(parts.length%20?%20parts.join(separator)%20:%20%60column_${c%20+%201}%60);%0A%20%20}%0A%20%20return%20uniquify(names);%0A}%0A%0Afunction%20buildGrid(table,%20options)%20{%0A%20%20const%20opts%20=%20options%20||%20{};%0A%20%20const%20separator%20=%20opts.separator%20===%20undefined%20?%20'%20/%20'%20:%20opts.separator;%0A%20%20const%20rows%20=%20orderRows(table);%0A%20%20const%20{%20slots,%20width,%20ragged,%20notes%20}%20=%20buildSlots(rows);%0A%20%20const%20headerRows%20=%20opts.headerRows%20===%20undefined%20?%20headerRowCount(rows,%20slots)%20:%20opts.headerRows;%0A%20%20const%20columns%20=%20columnNames(slots,%20headerRows,%20width,%20separator);%0A%0A%20%20const%20bodyRows%20=%20[];%0A%20%20const%20footRows%20=%20[];%0A%20%20for%20(let%20r%20=%20headerRows;%20r%20%3C%20slots.length;%20r%20+=%201)%20{%0A%20%20%20%20const%20values%20=%20[];%0A%20%20%20%20for%20(let%20c%20=%200;%20c%20%3C%20width;%20c%20+=%201)%20values.push(slots[r][c].text);%0A%20%20%20%20if%20(rows[r]%20&&%20rows[r].section%20===%20'tfoot')%20footRows.push(bodyRows.length);%0A%20%20%20%20bodyRows.push(values);%0A%20%20}%0A%0A%20%20return%20{%0A%20%20%20%20caption:%20table.caption%20||%20'',%0A%20%20%20%20width,%0A%20%20%20%20height:%20slots.length,%0A%20%20%20%20headerRows,%0A%20%20%20%20columns,%0A%20%20%20%20slots,%0A%20%20%20%20rows:%20bodyRows,%0A%20%20%20%20footRows,%0A%20%20%20%20ragged,%0A%20%20%20%20notes,%0A%20%20%20%20thCount:%20table.thCount,%0A%20%20%20%20tdCount:%20table.tdCount,%0A%20%20%20%20hasNestedTable:%20!!table.hasNestedTable,%0A%20%20%20%20attrs:%20table.attrs%20||%20{},%0A%20%20%20%20sections:%20rows.map((row)%20=%3E%20row.section),%0A%20%20};%0A}%0A%0A//%20The%20flat%20rectangle,%20header%20row%20included.%20Useful%20for%20tests%20and%20for%20eyeballing%20a%20fixture.%0Afunction%20rectangle(grid)%20{%0A%20%20const%20out%20=%20[];%0A%20%20for%20(let%20r%20=%200;%20r%20%3C%20grid.height;%20r%20+=%201)%20{%0A%20%20%20%20const%20line%20=%20[];%0A%20%20%20%20for%20(let%20c%20=%200;%20c%20%3C%20grid.width;%20c%20+=%201)%20line.push(grid.slots[r][c].text);%0A%20%20%20%20out.push(line);%0A%20%20}%0A%20%20return%20out;%0A}%0A%0Amodule.exports%20=%20{%20buildGrid,%20rectangle,%20orderRows,%20columnNames,%20headerRowCount%20};%0A%0A};%0A__defs['infer']%20=%20function(module,%20exports,%20require){%0A//%20Type%20inference,%20and%20the%20refusals%20that%20matter%20more%20than%20the%20inferences.%0A//%0A//%20The%20classic%20failure%20of%20a%20tool%20like%20this%20is%20eating%20a%20leading%20zero:%20a%20zip%20code%20column%20arrives%0A//%20as%207030,%202139,%2010001%20and%20nobody%20notices%20until%20a%20mailing%20goes%20out.%20So%20the%20guards%20come%20first%0A//%20and%20they%20are%20absolute.%20A%20version%20string,%20a%20phone%20number,%20a%20part%20code%20and%20anything%20with%20a%0A//%20leading%20zero%20stay%20text%20no%20matter%20how%20numeric%20they%20look.%0A//%0A//%20Everything%20else%20is%20decided%20per%20column%20rather%20than%20per%20cell,%20because%20one%20%22n/a%22%20in%20a%20column%20of%0A//%20integers%20should%20not%20turn%20the%20whole%20column%20into%20text,%20and%20one%20unambiguous%20date%20is%20enough%20to%0A//%20settle%20whether%20the%20ambiguous%20ones%20in%20the%20same%20column%20are%20day-first%20or%20month-first.%0A%0A'use%20strict';%0A%0Aconst%20NULLISH%20=%20new%20Set(['-',%20'%E2%80%93',%20'%E2%80%94',%20'?',%20'n/a',%20'na',%20'n.a.',%20'null',%20'none',%20'nil',%20'.']);%0A%0Aconst%20MONTHS%20=%20{%0A%20%20jan:%201,%20january:%201,%20feb:%202,%20february:%202,%20mar:%203,%20march:%203,%20apr:%204,%20april:%204,%0A%20%20may:%205,%20jun:%206,%20june:%206,%20jul:%207,%20july:%207,%20aug:%208,%20august:%208,%20sep:%209,%20sept:%209,%0A%20%20september:%209,%20oct:%2010,%20october:%2010,%20nov:%2011,%20november:%2011,%20dec:%2012,%20december:%2012,%0A};%0A%0Aconst%20CURRENCY%20=%20{%0A%20%20$:%20'USD',%20'%E2%82%AC':%20'EUR',%20'%C2%A3':%20'GBP',%20'%C2%A5':%20'JPY',%20'%E2%82%B9':%20'INR',%0A%20%20'us$':%20'USD',%20'a$':%20'AUD',%20'ca$':%20'CAD',%20'r$':%20'BRL',%0A%20%20usd:%20'USD',%20eur:%20'EUR',%20gbp:%20'GBP',%20jpy:%20'JPY',%20inr:%20'INR',%20chf:%20'CHF',%0A%20%20cad:%20'CAD',%20aud:%20'AUD',%20brl:%20'BRL',%0A};%0A%0Aconst%20DAYS_IN_MONTH%20=%20[31,%2028,%2031,%2030,%2031,%2030,%2031,%2031,%2030,%2031,%2030,%2031];%0A%0Afunction%20isRealDate(y,%20m,%20d)%20{%0A%20%20if%20(!(y%20%3E=%201%20&&%20y%20%3C=%209999)%20||%20!(m%20%3E=%201%20&&%20m%20%3C=%2012)%20||%20d%20%3C%201)%20return%20false;%0A%20%20let%20limit%20=%20DAYS_IN_MONTH[m%20-%201];%0A%20%20if%20(m%20===%202%20&&%20(y%20%25%204%20===%200%20&&%20(y%20%25%20100%20!==%200%20||%20y%20%25%20400%20===%200)))%20limit%20=%2029;%0A%20%20return%20d%20%3C=%20limit;%0A}%0A%0Aconst%20pad%20=%20(n)%20=%3E%20String(n).padStart(2,%20'0');%0Aconst%20iso%20=%20(y,%20m,%20d)%20=%3E%20%60${String(y).padStart(4,%20'0')}-${pad(m)}-${pad(d)}%60;%0A%0A//%20A%20number%20written%20with%20separators.%20Every%20accepted%20shape%20is%20listed,%20and%20anything%20not%20listed%20is%0A//%20text.%20Being%20permissive%20here%20is%20how%20%221.2.3%22%20becomes%201.23.%0Afunction%20parseDigits(body)%20{%0A%20%20const%20shapes%20=%20[%0A%20%20%20%20[/^(\d+)$/,%20(m)%20=%3E%20Number(m[1])],%0A%20%20%20%20//%201,234,567%20and%201,234,567.89%20--%20comma%20groups,%20dot%20decimal%0A%20%20%20%20[/^(\d{1,3}(?:,\d{3})+)$/,%20(m)%20=%3E%20Number(m[1].replace(/,/g,%20''))],%0A%20%20%20%20[/^(\d{1,3}(?:,\d{3})+)\.(\d+)$/,%20(m)%20=%3E%20Number(%60${m[1].replace(/,/g,%20'')}.${m[2]}%60)],%0A%20%20%20%20//%201.234.567%20and%201.234.567,89%20--%20the%20European%20convention,%20only%20when%20there%20are%20two%20or%20more%0A%20%20%20%20//%20groups.%20A%20single%20%221.234%22%20is%20read%20as%20a%20decimal,%20which%20is%20the%20English%20reading.%0A%20%20%20%20[/^(\d{1,3}(?:\.\d{3}){2,})$/,%20(m)%20=%3E%20Number(m[1].replace(/\./g,%20''))],%0A%20%20%20%20[/^(\d{1,3}(?:\.\d{3})+),(\d+)$/,%20(m)%20=%3E%20Number(%60${m[1].replace(/\./g,%20'')}.${m[2]}%60)],%0A%20%20%20%20//%201%20234%20567,%20the%20separator%20Wikipedia%20and%20most%20of%20Europe%20use%0A%20%20%20%20[/^(\d{1,3}(?:%20\d{3})+)$/,%20(m)%20=%3E%20Number(m[1].replace(/%20/g,%20''))],%0A%20%20%20%20[/^(\d{1,3}(?:%20\d{3})+)[.,](\d+)$/,%20(m)%20=%3E%20Number(%60${m[1].replace(/%20/g,%20'')}.${m[2]}%60)],%0A%20%20%20%20//%20plain%20decimals,%20either%20separator%0A%20%20%20%20[/^(\d+)\.(\d+)$/,%20(m)%20=%3E%20Number(%60${m[1]}.${m[2]}%60)],%0A%20%20%20%20//%201,5%20is%20a%20decimal%20comma;%201,234%20is%20a%20thousands%20group.%20Three%20digits%20after%20the%20comma%20is%20the%0A%20%20%20%20//%20grouping%20reading,%20which%20is%20the%20common%20case%20in%20English%20documents.%0A%20%20%20%20[/^(\d+),(\d{3})$/,%20(m)%20=%3E%20Number(m[1]%20+%20m[2])],%0A%20%20%20%20[/^(\d+),(\d{1,2}|\d{4,})$/,%20(m)%20=%3E%20Number(%60${m[1]}.${m[2]}%60)],%0A%20%20];%0A%20%20for%20(const%20[pattern,%20build]%20of%20shapes)%20{%0A%20%20%20%20const%20match%20=%20body.match(pattern);%0A%20%20%20%20if%20(match)%20{%0A%20%20%20%20%20%20const%20value%20=%20build(match);%0A%20%20%20%20%20%20if%20(Number.isFinite(value))%20return%20value;%0A%20%20%20%20}%0A%20%20}%0A%20%20return%20null;%0A}%0A%0Afunction%20parseNumber(text)%20{%0A%20%20let%20s%20=%20text;%0A%20%20let%20negative%20=%20false;%0A%20%20let%20currency%20=%20null;%0A%20%20let%20percent%20=%20false;%0A%0A%20%20const%20bracketed%20=%20s.match(/^\((.*)\)$/);%0A%20%20if%20(bracketed)%20{%0A%20%20%20%20negative%20=%20true;%0A%20%20%20%20s%20=%20bracketed[1].trim();%0A%20%20}%0A%20%20const%20lead%20=%20s.match(/^(US\$|A\$|CA\$|R\$|[$%E2%82%AC%C2%A3%C2%A5%E2%82%B9]|USD|EUR|GBP|JPY|INR|CHF|CAD|AUD|BRL)\s*/i);%0A%20%20if%20(lead)%20{%0A%20%20%20%20currency%20=%20CURRENCY[lead[1].toLowerCase()]%20||%20null;%0A%20%20%20%20s%20=%20s.slice(lead[0].length);%0A%20%20}%0A%20%20const%20trail%20=%20s.match(/\s*(USD|EUR|GBP|JPY|INR|CHF|CAD|AUD|BRL|[$%E2%82%AC%C2%A3%C2%A5%E2%82%B9])$/i);%0A%20%20if%20(trail)%20{%0A%20%20%20%20if%20(!currency)%20currency%20=%20CURRENCY[trail[1].toLowerCase()]%20||%20null;%0A%20%20%20%20s%20=%20s.slice(0,%20s.length%20-%20trail[0].length);%0A%20%20}%0A%20%20s%20=%20s.trim();%0A%20%20if%20(s.endsWith('%25'))%20{%0A%20%20%20%20percent%20=%20true;%0A%20%20%20%20s%20=%20s.slice(0,%20-1).trim();%0A%20%20}%0A%20%20const%20sign%20=%20s.match(/^([+\-%E2%88%92])\s*/);%0A%20%20if%20(sign)%20{%0A%20%20%20%20if%20(sign[1]%20!==%20'+')%20negative%20=%20!negative;%0A%20%20%20%20s%20=%20s.slice(sign[0].length).trim();%0A%20%20}%0A%20%20if%20(s%20===%20'')%20return%20null;%0A%20%20//%20Anything%20outside%20digits%20and%20the%20three%20separators%20is%20text.%20This%20is%20the%20line%20that%20keeps%0A%20%20//%20%22555-0134%22,%20%221,234-5,678%22%20and%20%2212%20items%22%20out.%0A%20%20if%20(!/^\d[\d.,%20]*$/.test(s))%20return%20null;%0A%20%20//%20The%20leading%20zero%20guard.%20%220%22%20and%20%220.5%22%20are%20numbers,%20%22007%22%20and%20%2207030%22%20are%20identifiers.%0A%20%20if%20(/^0\d/.test(s))%20return%20null;%0A%0A%20%20const%20value%20=%20parseDigits(s);%0A%20%20if%20(value%20===%20null)%20return%20null;%0A%20%20return%20{%0A%20%20%20%20type:%20'number',%0A%20%20%20%20value:%20negative%20?%20-value%20:%20value,%0A%20%20%20%20integer:%20Number.isInteger(negative%20?%20-value%20:%20value),%0A%20%20%20%20currency,%0A%20%20%20%20percent,%0A%20%20%20%20raw:%20text,%0A%20%20};%0A}%0A%0Afunction%20monthNumber(word)%20{%0A%20%20const%20key%20=%20word.toLowerCase().replace(/\.$/,%20'');%0A%20%20return%20Object.prototype.hasOwnProperty.call(MONTHS,%20key)%20?%20MONTHS[key]%20:%20null;%0A}%0A%0Afunction%20parseDate(text,%20options)%20{%0A%20%20const%20opts%20=%20options%20||%20{};%0A%20%20const%20dayFirstDefault%20=%20!!opts.dayFirst;%0A%20%20const%20s%20=%20text.trim();%0A%20%20let%20m;%0A%0A%20%20if%20((m%20=%20s.match(/^(\d{4})-(\d{2})-(\d{2})$/)))%20{%0A%20%20%20%20const%20[y,%20mo,%20d]%20=%20[+m[1],%20+m[2],%20+m[3]];%0A%20%20%20%20if%20(!isRealDate(y,%20mo,%20d))%20return%20null;%0A%20%20%20%20return%20{%20type:%20'date',%20value:%20iso(y,%20mo,%20d),%20format:%20'iso',%20ambiguous:%20false,%20alt:%20null,%20raw:%20text%20};%0A%20%20}%0A%20%20if%20((m%20=%20s.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/)))%20{%0A%20%20%20%20const%20[y,%20mo,%20d]%20=%20[+m[1],%20+m[2],%20+m[3]];%0A%20%20%20%20if%20(!isRealDate(y,%20mo,%20d))%20return%20null;%0A%20%20%20%20return%20{%20type:%20'date',%20value:%20iso(y,%20mo,%20d),%20format:%20'ymd',%20ambiguous:%20false,%20alt:%20null,%20raw:%20text%20};%0A%20%20}%0A%20%20//%20Numeric%20day%20and%20month%20with%20a%20four%20digit%20year.%20This%20is%20the%20ambiguous%20family.%0A%20%20if%20((m%20=%20s.match(/^(\d{1,2})([/.\-])(\d{1,2})\2(\d{4})$/)))%20{%0A%20%20%20%20const%20a%20=%20+m[1];%0A%20%20%20%20const%20b%20=%20+m[3];%0A%20%20%20%20const%20y%20=%20+m[4];%0A%20%20%20%20const%20dmy%20=%20isRealDate(y,%20b,%20a);%0A%20%20%20%20const%20mdy%20=%20isRealDate(y,%20a,%20b);%0A%20%20%20%20if%20(dmy%20&&%20mdy)%20{%0A%20%20%20%20%20%20const%20first%20=%20dayFirstDefault%20?%20iso(y,%20b,%20a)%20:%20iso(y,%20a,%20b);%0A%20%20%20%20%20%20const%20second%20=%20dayFirstDefault%20?%20iso(y,%20a,%20b)%20:%20iso(y,%20b,%20a);%0A%20%20%20%20%20%20return%20{%0A%20%20%20%20%20%20%20%20type:%20'date',%0A%20%20%20%20%20%20%20%20value:%20first,%0A%20%20%20%20%20%20%20%20format:%20dayFirstDefault%20?%20'dmy'%20:%20'mdy',%0A%20%20%20%20%20%20%20%20ambiguous:%20true,%0A%20%20%20%20%20%20%20%20alt:%20second,%0A%20%20%20%20%20%20%20%20raw:%20text,%0A%20%20%20%20%20%20};%0A%20%20%20%20}%0A%20%20%20%20if%20(dmy)%20return%20{%20type:%20'date',%20value:%20iso(y,%20b,%20a),%20format:%20'dmy',%20ambiguous:%20false,%20alt:%20null,%20raw:%20text%20};%0A%20%20%20%20if%20(mdy)%20return%20{%20type:%20'date',%20value:%20iso(y,%20a,%20b),%20format:%20'mdy',%20ambiguous:%20false,%20alt:%20null,%20raw:%20text%20};%0A%20%20%20%20return%20null;%0A%20%20}%0A%20%20//%203%20March%202026,%203rd%20March%202026,%203%20Mar.%202026%0A%20%20if%20((m%20=%20s.match(/^(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3,9}\.?),?\s+(\d{4})$/)))%20{%0A%20%20%20%20const%20mo%20=%20monthNumber(m[2]);%0A%20%20%20%20if%20(mo%20===%20null%20||%20!isRealDate(+m[3],%20mo,%20+m[1]))%20return%20null;%0A%20%20%20%20return%20{%20type:%20'date',%20value:%20iso(+m[3],%20mo,%20+m[1]),%20format:%20'month-name',%20ambiguous:%20false,%20alt:%20null,%20raw:%20text%20};%0A%20%20}%0A%20%20//%20March%203,%202026%20and%20Mar%203%202026%0A%20%20if%20((m%20=%20s.match(/^([A-Za-z]{3,9}\.?)\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})$/)))%20{%0A%20%20%20%20const%20mo%20=%20monthNumber(m[1]);%0A%20%20%20%20if%20(mo%20===%20null%20||%20!isRealDate(+m[3],%20mo,%20+m[2]))%20return%20null;%0A%20%20%20%20return%20{%20type:%20'date',%20value:%20iso(+m[3],%20mo,%20+m[2]),%20format:%20'month-name',%20ambiguous:%20false,%20alt:%20null,%20raw:%20text%20};%0A%20%20}%0A%20%20return%20null;%0A}%0A%0Afunction%20inferValue(raw,%20options)%20{%0A%20%20const%20text%20=%20String(raw%20===%20null%20||%20raw%20===%20undefined%20?%20''%20:%20raw).trim();%0A%20%20if%20(text%20===%20''%20||%20NULLISH.has(text.toLowerCase()))%20{%0A%20%20%20%20return%20{%20type:%20'empty',%20value:%20null,%20raw:%20text%20};%0A%20%20}%0A%20%20const%20date%20=%20parseDate(text,%20options);%0A%20%20if%20(date)%20return%20date;%0A%20%20const%20number%20=%20parseNumber(text);%0A%20%20if%20(number)%20return%20number;%0A%20%20return%20{%20type:%20'string',%20value:%20text,%20raw:%20text%20};%0A}%0A%0A//%20One%20column%20at%20a%20time.%20A%20mixed%20column%20is%20text,%20because%20half-typed%20data%20is%20worse%20than%20none.%0Afunction%20inferColumn(values,%20options)%20{%0A%20%20const%20cells%20=%20values.map((value)%20=%3E%20inferValue(value,%20options));%0A%20%20const%20present%20=%20cells.filter((cell)%20=%3E%20cell.type%20!==%20'empty');%0A%20%20const%20warnings%20=%20[];%0A%0A%20%20if%20(present.length%20===%200)%20{%0A%20%20%20%20return%20{%20type:%20'string',%20cells,%20warnings,%20integer:%20false,%20currency:%20null,%20percent:%20false%20};%0A%20%20}%0A%20%20if%20(present.every((cell)%20=%3E%20cell.type%20===%20'number'))%20{%0A%20%20%20%20const%20currencies%20=%20new%20Set(present.map((cell)%20=%3E%20cell.currency).filter(Boolean));%0A%20%20%20%20if%20(currencies.size%20%3E%201)%20warnings.push(%60mixed%20currencies:%20${[...currencies].sort().join(',%20')}%60);%0A%20%20%20%20return%20{%0A%20%20%20%20%20%20type:%20'number',%0A%20%20%20%20%20%20cells,%0A%20%20%20%20%20%20warnings,%0A%20%20%20%20%20%20integer:%20present.every((cell)%20=%3E%20cell.integer),%0A%20%20%20%20%20%20currency:%20currencies.size%20===%201%20?%20[...currencies][0]%20:%20null,%0A%20%20%20%20%20%20percent:%20present.every((cell)%20=%3E%20cell.percent),%0A%20%20%20%20};%0A%20%20}%0A%20%20if%20(present.every((cell)%20=%3E%20cell.type%20===%20'date'))%20{%0A%20%20%20%20const%20evidence%20=%20new%20Set(present.filter((cell)%20=%3E%20!cell.ambiguous).map((cell)%20=%3E%20cell.format));%0A%20%20%20%20const%20ambiguous%20=%20present.filter((cell)%20=%3E%20cell.ambiguous);%0A%20%20%20%20if%20(ambiguous.length)%20{%0A%20%20%20%20%20%20let%20dayFirst%20=%20null;%0A%20%20%20%20%20%20if%20(evidence.has('dmy')%20&&%20!evidence.has('mdy'))%20dayFirst%20=%20true;%0A%20%20%20%20%20%20else%20if%20(evidence.has('mdy')%20&&%20!evidence.has('dmy'))%20dayFirst%20=%20false;%0A%20%20%20%20%20%20if%20(dayFirst%20===%20null)%20{%0A%20%20%20%20%20%20%20%20warnings.push(%0A%20%20%20%20%20%20%20%20%20%20%60${ambiguous.length}%20ambiguous%20date(s)%20such%20as%20${ambiguous[0].raw}%20and%20nothing%20in%20the%20%60%0A%20%20%20%20%20%20%20%20%20%20+%20%60column%20settles%20day-first%20or%20month-first;%20read%20as%20${ambiguous[0].format}%60);%0A%20%20%20%20%20%20}%20else%20{%0A%20%20%20%20%20%20%20%20for%20(const%20cell%20of%20cells)%20{%0A%20%20%20%20%20%20%20%20%20%20if%20(cell.type%20===%20'date'%20&&%20cell.ambiguous)%20{%0A%20%20%20%20%20%20%20%20%20%20%20%20const%20wanted%20=%20dayFirst%20?%20'dmy'%20:%20'mdy';%0A%20%20%20%20%20%20%20%20%20%20%20%20if%20(cell.format%20!==%20wanted)%20{%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20const%20swapped%20=%20cell.alt;%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20cell.alt%20=%20cell.value;%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20cell.value%20=%20swapped;%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20cell.format%20=%20wanted;%0A%20%20%20%20%20%20%20%20%20%20%20%20}%0A%20%20%20%20%20%20%20%20%20%20%20%20cell.resolvedBy%20=%20'column';%0A%20%20%20%20%20%20%20%20%20%20}%0A%20%20%20%20%20%20%20%20}%0A%20%20%20%20%20%20%20%20warnings.push(%60${ambiguous.length}%20ambiguous%20date(s)%20read%20as%20%60%0A%20%20%20%20%20%20%20%20%20%20+%20%60${dayFirst%20?%20'day-first'%20:%20'month-first'}%20from%20the%20rest%20of%20the%20column%60);%0A%20%20%20%20%20%20}%0A%20%20%20%20}%0A%20%20%20%20return%20{%20type:%20'date',%20cells,%20warnings,%20integer:%20false,%20currency:%20null,%20percent:%20false%20};%0A%20%20}%0A%20%20//%20A%20mixed%20column%20is%20a%20text%20column,%20and%20that%20has%20to%20reach%20the%20individual%20cells.%20A%20ZIP%20column%0A%20%20//%20holding%2007030,%2002139%20and%2010001%20is%20the%20case:%20the%20first%20two%20are%20text%20by%20the%20leading%20zero%0A%20%20//%20guard,%20and%20leaving%20the%20third%20as%20the%20number%2010001%20puts%20two%20types%20in%20one%20JSON%20field.%0A%20%20const%20mixed%20=%20new%20Set(present.map((cell)%20=%3E%20cell.type));%0A%20%20for%20(const%20cell%20of%20cells)%20{%0A%20%20%20%20if%20(cell.type%20!==%20'empty'%20&&%20cell.type%20!==%20'string')%20{%0A%20%20%20%20%20%20cell.coercedFrom%20=%20cell.type;%0A%20%20%20%20%20%20cell.type%20=%20'string';%0A%20%20%20%20%20%20cell.value%20=%20cell.raw;%0A%20%20%20%20}%0A%20%20}%0A%20%20if%20(mixed.size%20%3E%201)%20warnings.push(%60mixed%20cell%20types%20(${[...mixed].sort().join(',%20')}),%20kept%20as%20text%60);%0A%20%20return%20{%20type:%20'string',%20cells,%20warnings,%20integer:%20false,%20currency:%20null,%20percent:%20false%20};%0A}%0A%0A//%20The%20typed%20view%20of%20a%20grid:%20one%20entry%20per%20column,%20and%20the%20rows%20re-emitted%20as%20typed%20values.%0Afunction%20analyse(grid,%20options)%20{%0A%20%20const%20columns%20=%20[];%0A%20%20for%20(let%20c%20=%200;%20c%20%3C%20grid.width;%20c%20+=%201)%20{%0A%20%20%20%20const%20raw%20=%20grid.rows.map((row)%20=%3E%20row[c]);%0A%20%20%20%20const%20inferred%20=%20inferColumn(raw,%20options);%0A%20%20%20%20let%20label%20=%20grid.columns[c];%0A%20%20%20%20if%20(inferred.type%20===%20'number'%20&&%20inferred.currency)%20label%20+=%20%60%20(${inferred.currency})%60;%0A%20%20%20%20else%20if%20(inferred.type%20===%20'number'%20&&%20inferred.percent)%20label%20+=%20'%20(%25)';%0A%20%20%20%20columns.push({%0A%20%20%20%20%20%20name:%20grid.columns[c],%0A%20%20%20%20%20%20label,%0A%20%20%20%20%20%20type:%20inferred.type,%0A%20%20%20%20%20%20integer:%20inferred.integer,%0A%20%20%20%20%20%20currency:%20inferred.currency,%0A%20%20%20%20%20%20percent:%20inferred.percent,%0A%20%20%20%20%20%20warnings:%20inferred.warnings,%0A%20%20%20%20%20%20cells:%20inferred.cells,%0A%20%20%20%20});%0A%20%20}%0A%20%20const%20rows%20=%20grid.rows.map((_,%20r)%20=%3E%20columns.map((column)%20=%3E%20column.cells[r]));%0A%20%20return%20{%20columns,%20rows,%20caption:%20grid.caption%20||%20''%20};%0A}%0A%0Amodule.exports%20=%20{%20inferValue,%20inferColumn,%20analyse,%20parseNumber,%20parseDate,%20NULLISH%20};%0A%0A};%0A__defs['detect']%20=%20function(module,%20exports,%20require){%0A//%20Is%20this%20a%20table%20of%20data,%20or%20a%20table%20being%20used%20to%20lay%20out%20a%20page?%0A//%0A//%20Old%20pages,%20and%20most%20HTML%20email,%20nest%20tables%20to%20position%20things.%20Exporting%20one%20of%20those%20as%20CSV%0A//%20produces%20a%20file%20that%20looks%20like%20data%20and%20is%20not,%20which%20is%20worse%20than%20refusing.%20So%20this%20scores%0A//%20the%20structural%20signals%20and%20refuses%20below%20a%20threshold.%20The%20caller%20can%20override%20with%20force,%0A//%20because%20a%20heuristic%20that%20cannot%20be%20overridden%20is%20a%20bug%20in%20someone's%20afternoon.%0A%0A'use%20strict';%0A%0Aconst%20PRESENTATION_ROLES%20=%20new%20Set(['presentation',%20'none']);%0A%0Afunction%20classify(grid)%20{%0A%20%20const%20reasons%20=%20[];%0A%20%20let%20score%20=%200;%0A%0A%20%20const%20role%20=%20String((grid.attrs%20&&%20grid.attrs.role)%20||%20'').toLowerCase();%0A%20%20if%20(PRESENTATION_ROLES.has(role))%20{%0A%20%20%20%20score%20+=%205;%0A%20%20%20%20reasons.push(%60role=%22${role}%22%20says%20outright%20that%20this%20is%20layout%60);%0A%20%20}%0A%20%20if%20(grid.hasNestedTable)%20{%0A%20%20%20%20score%20+=%203;%0A%20%20%20%20reasons.push('contains%20a%20nested%20table,%20which%20data%20tables%20almost%20never%20do');%0A%20%20}%0A%20%20if%20(grid.thCount%20===%200)%20{%0A%20%20%20%20score%20+=%201;%0A%20%20%20%20reasons.push('no%20th%20cells%20anywhere');%0A%20%20}%0A%20%20if%20(grid.height%20%3C%202)%20{%0A%20%20%20%20score%20+=%203;%0A%20%20%20%20reasons.push(%60only%20${grid.height}%20row(s)%60);%0A%20%20}%0A%20%20if%20(grid.width%20%3C%202)%20{%0A%20%20%20%20score%20+=%202;%0A%20%20%20%20reasons.push(%60only%20${grid.width}%20column(s)%60);%0A%20%20}%0A%20%20const%20attrs%20=%20grid.attrs%20||%20{};%0A%20%20const%20legacy%20=%20['border',%20'cellpadding',%20'cellspacing',%20'align',%20'bgcolor']%0A%20%20%20%20.filter((name)%20=%3E%20attrs[name]%20!==%20undefined);%0A%20%20if%20(legacy.length%20%3E=%202%20&&%20grid.thCount%20===%200)%20{%0A%20%20%20%20score%20+=%202;%0A%20%20%20%20reasons.push(%60legacy%20layout%20attributes%20(${legacy.join(',%20')})%20and%20no%20header%20cells%60);%0A%20%20}%0A%20%20if%20(grid.headerRows%20===%200%20&&%20grid.thCount%20===%200%20&&%20!grid.caption)%20{%0A%20%20%20%20score%20+=%201;%0A%20%20%20%20reasons.push('no%20caption,%20no%20thead%20and%20no%20header%20cells,%20so%20nothing%20names%20the%20columns');%0A%20%20}%0A%20%20const%20texts%20=%20[];%0A%20%20for%20(let%20r%20=%200;%20r%20%3C%20grid.height;%20r%20+=%201)%20{%0A%20%20%20%20for%20(let%20c%20=%200;%20c%20%3C%20grid.width;%20c%20+=%201)%20texts.push(grid.slots[r][c].text);%0A%20%20}%0A%20%20const%20longest%20=%20texts.reduce((best,%20text)%20=%3E%20Math.max(best,%20text.length),%200);%0A%20%20if%20(longest%20%3E%20400)%20{%0A%20%20%20%20score%20+=%202;%0A%20%20%20%20reasons.push(%60a%20cell%20holds%20${longest}%20characters,%20which%20reads%20as%20page%20copy%60);%0A%20%20}%0A%20%20if%20(grid.caption)%20{%0A%20%20%20%20score%20-=%201;%0A%20%20%20%20reasons.push('has%20a%20caption,%20which%20is%20a%20data%20table%20signal');%0A%20%20}%0A%20%20if%20(grid.headerRows%20%3E%200)%20{%0A%20%20%20%20score%20-=%201;%0A%20%20%20%20reasons.push('has%20a%20header%20row,%20which%20is%20a%20data%20table%20signal');%0A%20%20}%0A%0A%20%20return%20{%20isData:%20score%20%3C%203,%20score,%20reasons%20};%0A}%0A%0Amodule.exports%20=%20{%20classify%20};%0A%0A};%0A__defs['emit']%20=%20function(module,%20exports,%20require){%0A//%20The%20four%20output%20formats.%20All%20of%20them%20read%20the%20typed%20analysis,%20so%20a%20number%20is%20a%20number%20in%0A//%20every%20one%20of%20them%20and%20the%20thousands%20separator%20is%20gone%20exactly%20once.%0A%0A'use%20strict';%0A%0Aconst%20SQL_TYPES%20=%20{%20date:%20'DATE',%20string:%20'TEXT'%20};%0A%0Afunction%20cellText(cell)%20{%0A%20%20if%20(!cell%20||%20cell.type%20===%20'empty')%20return%20'';%0A%20%20if%20(cell.type%20===%20'number')%20return%20String(cell.value);%0A%20%20if%20(cell.type%20===%20'date')%20return%20cell.value;%0A%20%20return%20cell.raw;%0A}%0A%0Afunction%20csvField(text,%20delimiter)%20{%0A%20%20const%20needsQuote%20=%20text.includes(delimiter)%20||%20text.includes('%22')%20||%20/[\r\n]/.test(text)%0A%20%20%20%20||%20text%20!==%20text.trim();%0A%20%20return%20needsQuote%20?%20%60%22${text.replace(/%22/g,%20'%22%22')}%22%60%20:%20text;%0A}%0A%0Afunction%20toCSV(analysis,%20options)%20{%0A%20%20const%20opts%20=%20options%20||%20{};%0A%20%20const%20delimiter%20=%20opts.delimiter%20||%20',';%0A%20%20const%20newline%20=%20opts.newline%20||%20'\n';%0A%20%20const%20lines%20=%20[analysis.columns.map((column)%20=%3E%20csvField(column.label,%20delimiter)).join(delimiter)];%0A%20%20for%20(const%20row%20of%20analysis.rows)%20{%0A%20%20%20%20lines.push(row.map((cell)%20=%3E%20csvField(cellText(cell),%20delimiter)).join(delimiter));%0A%20%20}%0A%20%20return%20lines.join(newline)%20+%20newline;%0A}%0A%0Afunction%20toJSON(analysis,%20options)%20{%0A%20%20const%20opts%20=%20options%20||%20{};%0A%20%20const%20records%20=%20analysis.rows.map((row)%20=%3E%20{%0A%20%20%20%20const%20record%20=%20{};%0A%20%20%20%20row.forEach((cell,%20index)%20=%3E%20{%0A%20%20%20%20%20%20const%20column%20=%20analysis.columns[index];%0A%20%20%20%20%20%20if%20(!cell%20||%20cell.type%20===%20'empty')%20record[column.label]%20=%20null;%0A%20%20%20%20%20%20else%20if%20(cell.type%20===%20'number')%20record[column.label]%20=%20cell.value;%0A%20%20%20%20%20%20else%20if%20(cell.type%20===%20'date')%20record[column.label]%20=%20cell.value;%0A%20%20%20%20%20%20else%20record[column.label]%20=%20cell.raw;%0A%20%20%20%20});%0A%20%20%20%20return%20record;%0A%20%20});%0A%20%20return%20JSON.stringify(records,%20null,%20opts.indent%20===%20undefined%20?%202%20:%20opts.indent)%20+%20'\n';%0A}%0A%0Afunction%20mdCell(text)%20{%0A%20%20return%20text.replace(/\|/g,%20'\\|').replace(/\r?\n/g,%20'%20');%0A}%0A%0Afunction%20toMarkdown(analysis)%20{%0A%20%20const%20head%20=%20%60|%20${analysis.columns.map((column)%20=%3E%20mdCell(column.label)).join('%20|%20')}%20|%60;%0A%20%20const%20rule%20=%20%60|%20${analysis.columns.map((column)%20=%3E%20(column.type%20===%20'number'%20?%20'---:'%20:%20'---')).join('%20|%20')}%20|%60;%0A%20%20const%20body%20=%20analysis.rows.map(%0A%20%20%20%20(row)%20=%3E%20%60|%20${row.map((cell)%20=%3E%20mdCell(cellText(cell))).join('%20|%20')}%20|%60);%0A%20%20return%20[head,%20rule,%20...body].join('\n')%20+%20'\n';%0A}%0A%0Afunction%20identifier(name,%20index)%20{%0A%20%20let%20out%20=%20String(name).toLowerCase().replace(/[^a-z0-9]+/g,%20'_').replace(/_+/g,%20'_')%0A%20%20%20%20.replace(/^_+|_+$/g,%20'');%0A%20%20if%20(!out)%20out%20=%20%60column_${index%20+%201}%60;%0A%20%20if%20(/^\d/.test(out))%20out%20=%20%60c_${out}%60;%0A%20%20return%20out.slice(0,%2063);%0A}%0A%0Afunction%20uniqueIdentifiers(names)%20{%0A%20%20const%20seen%20=%20new%20Map();%0A%20%20return%20names.map((name,%20index)%20=%3E%20{%0A%20%20%20%20const%20base%20=%20identifier(name,%20index);%0A%20%20%20%20const%20count%20=%20seen.get(base)%20||%200;%0A%20%20%20%20seen.set(base,%20count%20+%201);%0A%20%20%20%20return%20count%20===%200%20?%20base%20:%20%60${base}_${count%20+%201}%60;%0A%20%20});%0A}%0A%0Afunction%20sqlLiteral(cell)%20{%0A%20%20if%20(!cell%20||%20cell.type%20===%20'empty')%20return%20'NULL';%0A%20%20if%20(cell.type%20===%20'number')%20return%20String(cell.value);%0A%20%20const%20text%20=%20cell.type%20===%20'date'%20?%20cell.value%20:%20cell.raw;%0A%20%20return%20%60'${text.replace(/'/g,%20%22''%22)}'%60;%0A}%0A%0Afunction%20sqlType(column)%20{%0A%20%20if%20(column.type%20===%20'number')%20return%20column.integer%20?%20'INTEGER'%20:%20'REAL';%0A%20%20return%20SQL_TYPES[column.type]%20||%20'TEXT';%0A}%0A%0Afunction%20toSQL(analysis,%20options)%20{%0A%20%20const%20opts%20=%20options%20||%20{};%0A%20%20const%20table%20=%20identifier(opts.table%20||%20analysis.caption%20||%20'grabbed_table',%200);%0A%20%20const%20names%20=%20uniqueIdentifiers(analysis.columns.map((column)%20=%3E%20column.name));%0A%20%20const%20widest%20=%20names.reduce((best,%20name)%20=%3E%20Math.max(best,%20name.length),%200);%0A%20%20const%20definitions%20=%20names.map(%0A%20%20%20%20(name,%20index)%20=%3E%20%60%20%20%22${name}%22${'%20'.repeat(widest%20-%20name.length)}%20${sqlType(analysis.columns[index])}%60);%0A%20%20const%20create%20=%20%60CREATE%20TABLE%20%22${table}%22%20(\n${definitions.join(',\n')}\n);%60;%0A%20%20if%20(!analysis.rows.length)%20return%20create%20+%20'\n';%0A%20%20const%20tuples%20=%20analysis.rows.map(%0A%20%20%20%20(row)%20=%3E%20%60%20%20(${row.map((cell)%20=%3E%20sqlLiteral(cell)).join(',%20')})%60);%0A%20%20const%20insert%20=%20%60INSERT%20INTO%20%22${table}%22%20(${names.map((name)%20=%3E%20%60%22${name}%22%60).join(',%20')})%20VALUES\n%60%0A%20%20%20%20+%20%60${tuples.join(',\n')};%60;%0A%20%20return%20%60${create}\n${insert}\n%60;%0A}%0A%0Aconst%20FORMATS%20=%20{%20csv:%20toCSV,%20json:%20toJSON,%20md:%20toMarkdown,%20markdown:%20toMarkdown,%20sql:%20toSQL%20};%0A%0Afunction%20emit(analysis,%20format,%20options)%20{%0A%20%20const%20fn%20=%20FORMATS[String(format).toLowerCase()];%0A%20%20if%20(!fn)%20throw%20new%20Error(%60unknown%20format:%20${format}%60);%0A%20%20return%20fn(analysis,%20options);%0A}%0A%0Amodule.exports%20=%20{%20toCSV,%20toJSON,%20toMarkdown,%20toSQL,%20emit,%20identifier,%20uniqueIdentifiers,%20cellText%20};%0A%0A};%0A__defs['dom']%20=%20function(module,%20exports,%20require){%0A//%20Read%20a%20live%20DOM%20table%20into%20the%20same%20structure%20the%20string%20parser%20produces,%20so%20the%20grid,%0A//%20inference%20and%20emitters%20cannot%20tell%20where%20a%20table%20came%20from.%0A%0A'use%20strict';%0A%0Aconst%20{%20collapse,%20textFromHtml%20}%20=%20require('./parse');%0A%0Afunction%20attrsOf(element)%20{%0A%20%20const%20attrs%20=%20{};%0A%20%20const%20list%20=%20element.attributes%20||%20[];%0A%20%20for%20(let%20i%20=%200;%20i%20%3C%20list.length;%20i%20+=%201)%20attrs[list[i].name.toLowerCase()]%20=%20list[i].value;%0A%20%20return%20attrs;%0A}%0A%0Afunction%20spanOf(element,%20name)%20{%0A%20%20const%20raw%20=%20element.getAttribute(name);%0A%20%20if%20(raw%20===%20null%20||%20raw%20===%20undefined)%20return%201;%0A%20%20const%20digits%20=%20String(raw).match(/\d+/);%0A%20%20if%20(!digits)%20return%201;%0A%20%20const%20value%20=%20parseInt(digits[0],%2010);%0A%20%20if%20(!Number.isFinite(value)%20||%20value%20%3C%200)%20return%201;%0A%20%20return%20Math.min(value,%201000);%0A}%0A%0Afunction%20sectionOf(row)%20{%0A%20%20let%20node%20=%20row.parentNode;%0A%20%20while%20(node%20&&%20node.nodeType%20===%201)%20{%0A%20%20%20%20const%20tag%20=%20node.tagName.toLowerCase();%0A%20%20%20%20if%20(tag%20===%20'thead'%20||%20tag%20===%20'tbody'%20||%20tag%20===%20'tfoot')%20return%20tag;%0A%20%20%20%20if%20(tag%20===%20'table')%20break;%0A%20%20%20%20node%20=%20node.parentNode;%0A%20%20}%0A%20%20return%20'tbody';%0A}%0A%0Afunction%20nearestTable(node)%20{%0A%20%20let%20current%20=%20node.parentNode;%0A%20%20while%20(current%20&&%20current.nodeType%20===%201)%20{%0A%20%20%20%20if%20(current.tagName.toLowerCase()%20===%20'table')%20return%20current;%0A%20%20%20%20current%20=%20current.parentNode;%0A%20%20}%0A%20%20return%20null;%0A}%0A%0A//%20A%20nested%20table's%20cells%20belong%20to%20the%20nested%20table,%20so%20they%20are%20removed%20before%20the%20text%20is%0A//%20read.%20The%20rest%20goes%20through%20the%20same%20flattener%20the%20string%20parser%20uses,%20rather%20than%20through%0A//%20textContent,%20so%20that%20an%20inline%20tag%20and%20a%20block%20tag%20are%20treated%20the%20same%20way%20in%20both.%0Afunction%20cellText(cell)%20{%0A%20%20const%20clone%20=%20cell.cloneNode(true);%0A%20%20const%20drop%20=%20clone.querySelectorAll%20?%20clone.querySelectorAll('script,style,table')%20:%20[];%0A%20%20for%20(let%20i%20=%200;%20i%20%3C%20drop.length;%20i%20+=%201)%20{%0A%20%20%20%20if%20(drop[i].parentNode)%20drop[i].parentNode.removeChild(drop[i]);%0A%20%20}%0A%20%20if%20(typeof%20clone.innerHTML%20===%20'string')%20return%20textFromHtml(clone.innerHTML);%0A%20%20return%20collapse(clone.textContent%20||%20'');%0A}%0A%0A//%20Only%20the%20cells%20that%20belong%20to%20this%20table,%20so%20a%20nested%20table's%20cells%20stay%20with%20the%20nested%20one.%0Afunction%20fromDom(table)%20{%0A%20%20const%20rows%20=%20[];%0A%20%20let%20thCount%20=%200;%0A%20%20let%20tdCount%20=%200;%0A%20%20let%20hasNestedTable%20=%20!!(table.querySelector%20&&%20table.querySelector('table'));%0A%20%20let%20hasExplicitHead%20=%20!!(table.querySelector%20&&%20table.querySelector('thead'));%0A%0A%20%20const%20allRows%20=%20table.querySelectorAll('tr');%0A%20%20for%20(let%20i%20=%200;%20i%20%3C%20allRows.length;%20i%20+=%201)%20{%0A%20%20%20%20const%20row%20=%20allRows[i];%0A%20%20%20%20if%20(nearestTable(row)%20!==%20table)%20continue;%0A%20%20%20%20const%20record%20=%20{%20cells:%20[],%20section:%20sectionOf(row)%20};%0A%20%20%20%20for%20(let%20j%20=%200;%20j%20%3C%20row.children.length;%20j%20+=%201)%20{%0A%20%20%20%20%20%20const%20cell%20=%20row.children[j];%0A%20%20%20%20%20%20const%20tag%20=%20cell.tagName%20?%20cell.tagName.toLowerCase()%20:%20'';%0A%20%20%20%20%20%20if%20(tag%20!==%20'th'%20&&%20tag%20!==%20'td')%20continue;%0A%20%20%20%20%20%20if%20(tag%20===%20'th')%20thCount%20+=%201;%0A%20%20%20%20%20%20else%20tdCount%20+=%201;%0A%20%20%20%20%20%20record.cells.push({%0A%20%20%20%20%20%20%20%20tag,%0A%20%20%20%20%20%20%20%20header:%20tag%20===%20'th',%0A%20%20%20%20%20%20%20%20colspan:%20Math.max(1,%20spanOf(cell,%20'colspan')),%0A%20%20%20%20%20%20%20%20rowspan:%20spanOf(cell,%20'rowspan'),%0A%20%20%20%20%20%20%20%20attrs:%20attrsOf(cell),%0A%20%20%20%20%20%20%20%20text:%20cellText(cell),%0A%20%20%20%20%20%20%20%20hasNestedTable:%20!!(cell.querySelector%20&&%20cell.querySelector('table')),%0A%20%20%20%20%20%20});%0A%20%20%20%20}%0A%20%20%20%20rows.push(record);%0A%20%20}%0A%0A%20%20const%20caption%20=%20table.querySelector('caption');%0A%20%20return%20{%0A%20%20%20%20attrs:%20attrsOf(table),%0A%20%20%20%20depth:%200,%0A%20%20%20%20caption:%20caption%20&&%20nearestTable(caption)%20===%20table%20?%20collapse(caption.textContent%20||%20'')%20:%20'',%0A%20%20%20%20rows,%0A%20%20%20%20hasNestedTable,%0A%20%20%20%20thCount,%0A%20%20%20%20tdCount,%0A%20%20%20%20hasExplicitHead,%0A%20%20};%0A}%0A%0Amodule.exports%20=%20{%20fromDom,%20cellText%20};%0A%0A};%0A__defs['ui']%20=%20function(module,%20exports,%20require){%0A//%20The%20bookmarklet's%20on-page%20half:%20hover%20to%20highlight%20a%20table,%20click%20to%20export%20it.%0A//%0A//%20Everything%20is%20inline%20styled%20and%20scoped%20to%20one%20container,%20because%20this%20runs%20on%20somebody%0A//%20else's%20page%20and%20has%20no%20business%20touching%20their%20stylesheet.%0A%0A'use%20strict';%0A%0Aconst%20{%20fromDom%20}%20=%20require('./dom');%0Aconst%20{%20buildGrid%20}%20=%20require('./grid');%0Aconst%20{%20analyse%20}%20=%20require('./infer');%0Aconst%20{%20classify%20}%20=%20require('./detect');%0Aconst%20{%20emit%20}%20=%20require('./emit');%0A%0Aconst%20PANEL_ID%20=%20'tablegrab-panel';%0Aconst%20HIGHLIGHT%20=%20'2px%20solid%20%23d6482f';%0Aconst%20FORMATS%20=%20[['csv',%20'CSV'],%20['json',%20'JSON'],%20['md',%20'Markdown'],%20['sql',%20'SQL']];%0A%0Afunction%20style(element,%20rules)%20{%0A%20%20for%20(const%20key%20of%20Object.keys(rules))%20element.style[key]%20=%20rules[key];%0A%20%20return%20element;%0A}%0A%0Afunction%20make(tag,%20rules,%20text)%20{%0A%20%20const%20element%20=%20document.createElement(tag);%0A%20%20if%20(rules)%20style(element,%20rules);%0A%20%20if%20(text%20!==%20undefined)%20element.textContent%20=%20text;%0A%20%20return%20element;%0A}%0A%0Afunction%20activate(options)%20{%0A%20%20const%20opts%20=%20options%20||%20{};%0A%20%20const%20root%20=%20opts.root%20||%20document;%0A%20%20if%20(document.getElementById(PANEL_ID))%20return%20null;%0A%0A%20%20const%20state%20=%20{%20hovered:%20null,%20table:%20null,%20format:%20'csv',%20force:%20false,%20saved:%20''%20};%0A%0A%20%20const%20panel%20=%20make('div',%20{%0A%20%20%20%20position:%20'fixed',%20right:%20'12px',%20bottom:%20'12px',%20width:%20'min(560px,%20calc(100vw%20-%2024px))',%0A%20%20%20%20maxHeight:%20'70vh',%20zIndex:%20'2147483647',%20background:%20'%23fff',%20color:%20'%23191a1c',%0A%20%20%20%20border:%20'1px%20solid%20%23c9c9c9',%20borderRadius:%20'8px',%20boxShadow:%20'0%208px%2030px%20rgba(0,0,0,.25)',%0A%20%20%20%20font:%20'13px/1.45%20ui-sans-serif,%20system-ui,%20sans-serif',%20display:%20'flex',%0A%20%20%20%20flexDirection:%20'column',%20overflow:%20'hidden',%0A%20%20});%0A%20%20panel.id%20=%20PANEL_ID;%0A%0A%20%20const%20head%20=%20style(make('div'),%20{%0A%20%20%20%20display:%20'flex',%20gap:%20'6px',%20alignItems:%20'center',%20padding:%20'8px%2010px',%0A%20%20%20%20borderBottom:%20'1px%20solid%20%23e4e4e4',%20flexWrap:%20'wrap',%0A%20%20});%0A%20%20const%20title%20=%20make('strong',%20{%20marginRight:%20'auto'%20},%20'tablegrab');%0A%20%20head.appendChild(title);%0A%0A%20%20const%20buttons%20=%20{};%0A%20%20for%20(const%20[key,%20label]%20of%20FORMATS)%20{%0A%20%20%20%20const%20button%20=%20make('button',%20{%0A%20%20%20%20%20%20font:%20'inherit',%20padding:%20'3px%209px',%20borderRadius:%20'5px',%20cursor:%20'pointer',%0A%20%20%20%20%20%20border:%20'1px%20solid%20%23c9c9c9',%20background:%20'%23f4f4f4',%0A%20%20%20%20},%20label);%0A%20%20%20%20button.addEventListener('click',%20()%20=%3E%20{%0A%20%20%20%20%20%20state.format%20=%20key;%0A%20%20%20%20%20%20render();%0A%20%20%20%20});%0A%20%20%20%20buttons[key]%20=%20button;%0A%20%20%20%20head.appendChild(button);%0A%20%20}%0A%20%20const%20close%20=%20make('button',%20{%0A%20%20%20%20font:%20'inherit',%20padding:%20'3px%209px',%20borderRadius:%20'5px',%20cursor:%20'pointer',%0A%20%20%20%20border:%20'1px%20solid%20%23c9c9c9',%20background:%20'%23f4f4f4',%0A%20%20},%20'Close');%0A%20%20close.addEventListener('click',%20()%20=%3E%20deactivate());%0A%20%20head.appendChild(close);%0A%0A%20%20const%20status%20=%20style(make('div'),%20{%0A%20%20%20%20padding:%20'6px%2010px',%20color:%20'%235d626a',%20borderBottom:%20'1px%20solid%20%23e4e4e4',%0A%20%20});%0A%20%20status.textContent%20=%20'Hover%20a%20table,%20then%20click%20it.';%0A%0A%20%20const%20output%20=%20make('textarea');%0A%20%20style(output,%20{%0A%20%20%20%20flex:%20'1',%20minHeight:%20'160px',%20margin:%20'0',%20padding:%20'10px',%20border:%20'0',%0A%20%20%20%20resize:%20'vertical',%20font:%20'12px/1.5%20ui-monospace,%20SFMono-Regular,%20Menlo,%20monospace',%0A%20%20%20%20outline:%20'none',%20background:%20'%23fbfaf8',%20color:%20'%23191a1c',%20whiteSpace:%20'pre',%0A%20%20});%0A%20%20output.setAttribute('readonly',%20'readonly');%0A%20%20output.id%20=%20'tablegrab-output';%0A%0A%20%20const%20foot%20=%20style(make('div'),%20{%0A%20%20%20%20display:%20'flex',%20gap:%20'6px',%20padding:%20'8px%2010px',%20borderTop:%20'1px%20solid%20%23e4e4e4',%0A%20%20});%0A%20%20const%20copy%20=%20make('button',%20{%0A%20%20%20%20font:%20'inherit',%20padding:%20'3px%209px',%20borderRadius:%20'5px',%20cursor:%20'pointer',%0A%20%20%20%20border:%20'1px%20solid%20%23c9c9c9',%20background:%20'%23f4f4f4',%0A%20%20},%20'Copy');%0A%20%20copy.addEventListener('click',%20()%20=%3E%20{%0A%20%20%20%20output.removeAttribute('readonly');%0A%20%20%20%20output.select();%0A%20%20%20%20let%20ok%20=%20false;%0A%20%20%20%20try%20{%0A%20%20%20%20%20%20ok%20=%20document.execCommand('copy');%0A%20%20%20%20}%20catch%20(err)%20{%0A%20%20%20%20%20%20ok%20=%20false;%0A%20%20%20%20}%0A%20%20%20%20output.setAttribute('readonly',%20'readonly');%0A%20%20%20%20copy.textContent%20=%20ok%20?%20'Copied'%20:%20'Select%20and%20copy';%0A%20%20});%0A%20%20const%20download%20=%20make('button',%20{%0A%20%20%20%20font:%20'inherit',%20padding:%20'3px%209px',%20borderRadius:%20'5px',%20cursor:%20'pointer',%0A%20%20%20%20border:%20'1px%20solid%20%23c9c9c9',%20background:%20'%23f4f4f4',%0A%20%20},%20'Download');%0A%20%20download.addEventListener('click',%20()%20=%3E%20{%0A%20%20%20%20const%20extension%20=%20state.format%20===%20'md'%20?%20'md'%20:%20state.format;%0A%20%20%20%20const%20blob%20=%20new%20Blob([output.value],%20{%20type:%20'text/plain;charset=utf-8'%20});%0A%20%20%20%20const%20link%20=%20make('a');%0A%20%20%20%20link.href%20=%20URL.createObjectURL(blob);%0A%20%20%20%20link.download%20=%20%60table.${extension}%60;%0A%20%20%20%20document.body.appendChild(link);%0A%20%20%20%20link.click();%0A%20%20%20%20document.body.removeChild(link);%0A%20%20%20%20URL.revokeObjectURL(link.href);%0A%20%20});%0A%20%20const%20forceLabel%20=%20style(make('label'),%20{%20marginLeft:%20'auto',%20color:%20'%235d626a'%20});%0A%20%20const%20forceBox%20=%20make('input');%0A%20%20forceBox.type%20=%20'checkbox';%0A%20%20forceBox.addEventListener('change',%20()%20=%3E%20{%0A%20%20%20%20state.force%20=%20forceBox.checked;%0A%20%20%20%20render();%0A%20%20});%0A%20%20forceLabel.appendChild(forceBox);%0A%20%20forceLabel.appendChild(document.createTextNode('%20export%20anyway'));%0A%0A%20%20foot.appendChild(copy);%0A%20%20foot.appendChild(download);%0A%20%20foot.appendChild(forceLabel);%0A%0A%20%20panel.appendChild(head);%0A%20%20panel.appendChild(status);%0A%20%20panel.appendChild(output);%0A%20%20panel.appendChild(foot);%0A%20%20document.body.appendChild(panel);%0A%0A%20%20function%20highlight(table)%20{%0A%20%20%20%20if%20(state.hovered%20===%20table)%20return;%0A%20%20%20%20if%20(state.hovered%20&&%20state.hovered%20!==%20state.table)%20{%0A%20%20%20%20%20%20state.hovered.style.outline%20=%20state.hovered.getAttribute('data-tablegrab-outline')%20||%20'';%0A%20%20%20%20}%0A%20%20%20%20state.hovered%20=%20table;%0A%20%20%20%20if%20(table%20&&%20table%20!==%20state.table)%20{%0A%20%20%20%20%20%20table.setAttribute('data-tablegrab-outline',%20table.style.outline%20||%20'');%0A%20%20%20%20%20%20table.style.outline%20=%20'2px%20dashed%20%23d6482f';%0A%20%20%20%20}%0A%20%20}%0A%0A%20%20function%20nearestTable(node)%20{%0A%20%20%20%20let%20current%20=%20node;%0A%20%20%20%20while%20(current%20&&%20current%20!==%20document.body)%20{%0A%20%20%20%20%20%20if%20(current.tagName%20&&%20current.tagName.toLowerCase()%20===%20'table')%20return%20current;%0A%20%20%20%20%20%20current%20=%20current.parentNode;%0A%20%20%20%20}%0A%20%20%20%20return%20null;%0A%20%20}%0A%0A%20%20function%20onOver(event)%20{%0A%20%20%20%20if%20(panel.contains(event.target))%20return;%0A%20%20%20%20highlight(nearestTable(event.target));%0A%20%20}%0A%0A%20%20function%20onClick(event)%20{%0A%20%20%20%20if%20(panel.contains(event.target))%20return;%0A%20%20%20%20const%20table%20=%20nearestTable(event.target);%0A%20%20%20%20if%20(!table)%20return;%0A%20%20%20%20event.preventDefault();%0A%20%20%20%20event.stopPropagation();%0A%20%20%20%20select(table);%0A%20%20}%0A%0A%20%20function%20onKey(event)%20{%0A%20%20%20%20if%20(event.key%20===%20'Escape')%20deactivate();%0A%20%20}%0A%0A%20%20function%20select(table)%20{%0A%20%20%20%20if%20(state.table%20&&%20state.table%20!==%20table)%20state.table.style.outline%20=%20'';%0A%20%20%20%20state.table%20=%20table;%0A%20%20%20%20table.style.outline%20=%20HIGHLIGHT;%0A%20%20%20%20render();%0A%20%20}%0A%0A%20%20function%20render()%20{%0A%20%20%20%20for%20(const%20[key]%20of%20FORMATS)%20{%0A%20%20%20%20%20%20buttons[key].style.background%20=%20key%20===%20state.format%20?%20'%23191a1c'%20:%20'%23f4f4f4';%0A%20%20%20%20%20%20buttons[key].style.color%20=%20key%20===%20state.format%20?%20'%23fff'%20:%20'%23191a1c';%0A%20%20%20%20}%0A%20%20%20%20copy.textContent%20=%20'Copy';%0A%20%20%20%20if%20(!state.table)%20{%0A%20%20%20%20%20%20output.value%20=%20'';%0A%20%20%20%20%20%20status.textContent%20=%20'Hover%20a%20table,%20then%20click%20it.';%0A%20%20%20%20%20%20return;%0A%20%20%20%20}%0A%20%20%20%20const%20grid%20=%20buildGrid(fromDom(state.table),%20opts);%0A%20%20%20%20const%20verdict%20=%20classify(grid);%0A%20%20%20%20if%20(!verdict.isData%20&&%20!state.force)%20{%0A%20%20%20%20%20%20output.value%20=%20'';%0A%20%20%20%20%20%20status.textContent%20=%20%60Refused:%20this%20looks%20like%20a%20layout%20table%20(score%20${verdict.score}).%20%60%0A%20%20%20%20%20%20%20%20+%20%60${verdict.reasons.join(';%20')}.%60;%0A%20%20%20%20%20%20return;%0A%20%20%20%20}%0A%20%20%20%20const%20analysis%20=%20analyse(grid,%20opts);%0A%20%20%20%20output.value%20=%20emit(analysis,%20state.format,%20opts);%0A%20%20%20%20const%20warnings%20=%20analysis.columns%0A%20%20%20%20%20%20.filter((column)%20=%3E%20column.warnings.length)%0A%20%20%20%20%20%20.map((column)%20=%3E%20%60${column.name}:%20${column.warnings.join(';%20')}%60)%0A%20%20%20%20%20%20.concat(grid.notes)%0A%20%20%20%20%20%20.concat(grid.ragged.length%20?%20[%60${grid.ragged.length}%20short%20row(s)%20padded%60]%20:%20[]);%0A%20%20%20%20status.textContent%20=%20%60${grid.height}%20x%20${grid.width},%20${grid.headerRows}%20header%20row(s),%20%60%0A%20%20%20%20%20%20+%20%60${analysis.rows.length}%20data%20rows.%20${warnings.join('%20|%20')%20||%20'No%20warnings.'}%60;%0A%20%20}%0A%0A%20%20function%20deactivate()%20{%0A%20%20%20%20root.removeEventListener('mouseover',%20onOver,%20true);%0A%20%20%20%20root.removeEventListener('click',%20onClick,%20true);%0A%20%20%20%20document.removeEventListener('keydown',%20onKey,%20true);%0A%20%20%20%20if%20(state.hovered)%20state.hovered.style.outline%20=%20'';%0A%20%20%20%20if%20(state.table)%20state.table.style.outline%20=%20'';%0A%20%20%20%20if%20(panel.parentNode)%20panel.parentNode.removeChild(panel);%0A%20%20}%0A%0A%20%20root.addEventListener('mouseover',%20onOver,%20true);%0A%20%20root.addEventListener('click',%20onClick,%20true);%0A%20%20document.addEventListener('keydown',%20onKey,%20true);%0A%0A%20%20return%20{%20select,%20render,%20deactivate,%20state,%20panel%20};%0A}%0A%0Amodule.exports%20=%20{%20activate,%20PANEL_ID%20};%0A%0A};%0A__defs['index']%20=%20function(module,%20exports,%20require){%0A'use%20strict';%0A%0Aconst%20{%20parseTables,%20collapse%20}%20=%20require('./parse');%0Aconst%20{%20buildGrid,%20rectangle%20}%20=%20require('./grid');%0Aconst%20{%20analyse,%20inferValue,%20inferColumn%20}%20=%20require('./infer');%0Aconst%20{%20classify%20}%20=%20require('./detect');%0Aconst%20{%20emit,%20toCSV,%20toJSON,%20toMarkdown,%20toSQL%20}%20=%20require('./emit');%0Aconst%20{%20fromDom%20}%20=%20require('./dom');%0A%0A//%20One%20table,%20from%20parsed%20cells%20to%20a%20finished%20export.%0Afunction%20grabTable(table,%20options)%20{%0A%20%20const%20opts%20=%20options%20||%20{};%0A%20%20const%20grid%20=%20buildGrid(table,%20opts);%0A%20%20const%20verdict%20=%20classify(grid);%0A%20%20if%20(!verdict.isData%20&&%20!opts.force)%20{%0A%20%20%20%20const%20error%20=%20new%20Error(%0A%20%20%20%20%20%20%60refused:%20this%20looks%20like%20a%20layout%20table%20(score%20${verdict.score}).%20%60%0A%20%20%20%20%20%20+%20%60${verdict.reasons.join(';%20')}.%20Pass%20force%20to%20export%20it%20anyway.%60);%0A%20%20%20%20error.verdict%20=%20verdict;%0A%20%20%20%20error.grid%20=%20grid;%0A%20%20%20%20throw%20error;%0A%20%20}%0A%20%20const%20analysis%20=%20analyse(grid,%20opts);%0A%20%20return%20{%20grid,%20analysis,%20verdict,%20output:%20opts.format%20?%20emit(analysis,%20opts.format,%20opts)%20:%20null%20};%0A}%0A%0A//%20Every%20table%20in%20a%20document,%20in%20source%20order.%0Afunction%20grab(html,%20options)%20{%0A%20%20const%20opts%20=%20options%20||%20{};%0A%20%20const%20tables%20=%20parseTables(html);%0A%20%20if%20(opts.index%20!==%20undefined)%20{%0A%20%20%20%20if%20(!tables[opts.index])%20throw%20new%20Error(%60no%20table%20at%20index%20${opts.index}%20(found%20${tables.length})%60);%0A%20%20%20%20return%20grabTable(tables[opts.index],%20opts);%0A%20%20}%0A%20%20return%20tables.map((table)%20=%3E%20{%0A%20%20%20%20try%20{%0A%20%20%20%20%20%20return%20grabTable(table,%20opts);%0A%20%20%20%20}%20catch%20(err)%20{%0A%20%20%20%20%20%20return%20{%20error:%20String(err.message),%20verdict:%20err.verdict%20||%20null,%20grid:%20err.grid%20||%20null%20};%0A%20%20%20%20}%0A%20%20});%0A}%0A%0Amodule.exports%20=%20{%0A%20%20parseTables,%20fromDom,%20buildGrid,%20rectangle,%20analyse,%20inferValue,%20inferColumn,%0A%20%20classify,%20emit,%20toCSV,%20toJSON,%20toMarkdown,%20toSQL,%20grab,%20grabTable,%20collapse,%0A};%0A%0A};%0Avar%20api%20=%20require('index');%0Aapi.activate%20=%20require('ui').activate;%0Aglobal.TableGrab%20=%20api;%0A})(typeof%20window%20!==%20'undefined'%20?%20window%20:%20this);%0A%0Awindow.TableGrab.activate({});})();">tablegrab</a>
+&nbsp; <button id="activate">or run it here</button></p>
+
+<h2>What it does</h2>
+<p>Merged cells are the whole problem. A table with <code>colspan</code> and <code>rowspan</code>
+is a sparse description of a grid, and CSV wants the dense one, so every merged cell is repeated
+into the slots it covers and a short row is padded rather than shifted. A header two or three
+rows deep collapses into one compound name per column: <code>Revenue / 2023</code>.</p>
+<p>Numbers lose their thousands separators and currency symbols, dates become ISO, and the
+values that only look numeric stay text. A postcode of <code>07030</code> that comes back as
+7030 is the failure this is built around, so version strings, phone numbers, part codes and
+anything with a leading zero are refused, and one refused value makes the whole column text.</p>
+<p>Output is CSV, JSON, Markdown, or a <code>CREATE TABLE</code> and <code>INSERT</code> pair.
+No network, no dependency, nothing leaves the page.</p>
+
+<h2>Demo tables</h2>
+<p>These are the test fixtures. The check at the bottom of this page runs against them in your
+browser, through the same code the bookmarklet uses.</p>
+<h3>Merged cells</h3>
+<p>A header two rows deep, a group header over two columns, a row label spanning three rows, and a tfoot written before the tbody.</p>
+<div id="demo-merged"><div class="scroll"><table class="wikitable">
+  <caption>Regional revenue</caption>
+  <thead>
+    <tr>
+      <th rowspan="2">Region</th>
+      <th rowspan="2">Country</th>
+      <th colspan="2">Revenue</th>
+      <th rowspan="2">Reported</th>
+    </tr>
+    <tr>
+      <th>2023</th>
+      <th>2024</th>
+    </tr>
+  </thead>
+  <tfoot>
+    <tr>
+      <th colspan="2">Total</th>
+      <td>$16,561,110</td>
+      <td>$16,951,004.50</td>
+      <td>2024-12-31</td>
+    </tr>
+  </tfoot>
+  <tbody>
+    <tr>
+      <td rowspan="3">North America</td>
+      <td>Canada</td>
+      <td>$1,234,567</td>
+      <td>$1,301,004.50</td>
+      <td>2024-01-15</td>
+    </tr>
+    <tr>
+      <td>United States</td>
+      <td>$9,876,543</td>
+      <td>$10,200,000</td>
+      <td>15/02/2024</td>
+    </tr>
+    <tr>
+      <td>Mexico</td>
+      <td>$450,000</td>
+      <td>&mdash;</td>
+      <td>3 March 2024</td>
+    </tr>
+    <tr>
+      <td rowspan="2">Europe</td>
+      <td>France</td>
+      <td>$2,000,000</td>
+      <td>$2,150,000</td>
+      <td>2024-04-01</td>
+    </tr>
+    <tr>
+      <td>Germany</td>
+      <td>$3,000,000</td>
+      <td>$3,300,000</td>
+      <td>May 6, 2024</td>
+    </tr>
+  </tbody>
+</table></div></div><h3>Ragged and three deep</h3>
+<p>No thead at all, one row missing two cells, and a rowspan="0" running to the end of the section.</p>
+<div id="demo-ragged"><div class="scroll"><table border="1">
+  <tr>
+    <th rowspan="3">Item</th>
+    <th colspan="4">Measurements</th>
+  </tr>
+  <tr>
+    <th colspan="2">Metric</th>
+    <th colspan="2">Imperial</th>
+  </tr>
+  <tr>
+    <th>Length (mm)<th>Mass (kg)<th>Length (in)<th>Mass (lb)
+  <tr>
+    <td>Rail<sup>[1]</sup><td>1&nbsp;435<td>60<td>56.5<td>132
+  <tr>
+    <td>Sleeper<td>2&nbsp;600<td>250
+  <tr>
+    <td rowspan="0">Ballast<td>300<td>1&nbsp;800<td>11.8<td>3&nbsp;968
+  <tr>
+    <td>350<td>1&nbsp;900<td>13.8<td>4&nbsp;189
+</table></div></div><h3>What must not be coerced</h3>
+<p>Version strings, phone numbers and a postcode with a leading zero stay text. The money and percentages do not.</p>
+<div id="demo-types"><div class="scroll"><table>
+  <caption>Release ledger</caption>
+  <thead>
+    <tr>
+      <th>Package</th><th>Version</th><th>Phone</th><th>ZIP</th><th>Part</th>
+      <th>Change</th><th>Balance</th><th>Rate</th><th>Ratio</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>tablegrab</td><td>1.2.3</td><td>555-0134</td><td>07030</td><td>X-100</td>
+      <td>+12.5%</td><td>(1,234.56)</td><td>0</td><td>1.234</td>
+    </tr>
+    <tr>
+      <td>subwatch</td><td>2.0.0</td><td>555-0199</td><td>02139</td><td>X-200</td>
+      <td>-3.5%</td><td>2,000</td><td>0.5</td><td>2.5</td>
+    </tr>
+    <tr>
+      <td>hexcheck</td><td>10.4.1</td><td>555-1234</td><td>10001</td><td>X-300</td>
+      <td>0%</td><td>-15.5</td><td>1</td><td>0.75</td>
+    </tr>
+  </tbody>
+</table></div></div><h3>Ambiguous dates</h3>
+<p>15/05/2024 can only be day-first, which settles the two beside it. The Deadline column has nothing to settle it and says so.</p>
+<div id="demo-dates"><div class="scroll"><table>
+  <caption>Milestones</caption>
+  <thead><tr><th>Event</th><th>Start</th><th>Deadline</th></tr></thead>
+  <tbody>
+    <tr><td>Kickoff</td><td>03/04/2024</td><td>01/02/2024</td></tr>
+    <tr><td>Review</td><td>15/05/2024</td><td>05/06/2024</td></tr>
+    <tr><td>Close</td><td>06/07/2024</td><td>07/08/2024</td></tr>
+  </tbody>
+</table></div></div><h3>Not data</h3>
+<p>Page furniture from the table-layout era, with a real data table inside it. The outer two are refused.</p>
+<div id="demo-layout"><div class="scroll"><table width="100%" border="0" cellpadding="0" cellspacing="0">
+  <tr>
+    <td align="left">Acme Analytics</td>
+    <td align="right">Sign in</td>
+  </tr>
+  <tr>
+    <td colspan="2">
+      <table>
+        <caption>Quarterly headcount</caption>
+        <thead><tr><th>Quarter</th><th>Engineering</th><th>Sales</th></tr></thead>
+        <tbody>
+          <tr><td>Q1</td><td>42</td><td>18</td></tr>
+          <tr><td>Q2</td><td>47</td><td>21</td></tr>
+          <tr><td>Q3</td><td>51</td><td>26</td></tr>
+        </tbody>
+      </table>
+    </td>
+  </tr>
+</table></div><div class="scroll"><table role="presentation">
+  <tr><td>Terms</td><td>Privacy</td></tr>
+  <tr><td>Status</td><td>Careers</td></tr>
+</table></div></div>
+
+<h2>Self-check</h2>
+<p>Run on load, in this browser, against answers written out by hand before the code existed.</p>
+<pre id="selftest">the script did not run</pre>
+
+<footer><a href="https://github.com/JesseRWeigel/tablegrab">tablegrab</a> is MIT licensed.
+One of a <a href="https://github.com/JesseRWeigel/722-things-to-build">catalog</a> of build
+ideas. This page is generated from the source, and the build fails if it drifts.</footer>
+</main>
+<script>var EXPECT = [{"columns":["Region","Country","Revenue / 2023","Revenue / 2024","Reported"],"container":"demo-merged","index":0,"isData":true,"types":["string","string","number","number","date"],"values":[["North America","Canada",1234567,1301004.5,"2024-01-15"],["North America","United States",9876543,10200000,"2024-02-15"],["North America","Mexico",450000,null,"2024-03-03"],["Europe","France",2000000,2150000,"2024-04-01"],["Europe","Germany",3000000,3300000,"2024-05-06"],["Total","Total",16561110,16951004.5,"2024-12-31"]]},{"columns":["Item","Measurements / Metric / Length (mm)","Measurements / Metric / Mass (kg)","Measurements / Imperial / Length (in)","Measurements / Imperial / Mass (lb)"],"container":"demo-ragged","index":0,"isData":true,"types":["string","number","number","number","number"],"values":[["Rail[1]",1435,60,56.5,132],["Sleeper",2600,250,null,null],["Ballast",300,1800,11.8,3968],["Ballast",350,1900,13.8,4189]]},{"columns":["Package","Version","Phone","ZIP","Part","Change","Balance","Rate","Ratio"],"container":"demo-types","index":0,"isData":true,"types":["string","string","string","string","string","number","number","number","number"],"values":[["tablegrab","1.2.3","555-0134","07030","X-100",12.5,-1234.56,0,1.234],["subwatch","2.0.0","555-0199","02139","X-200",-3.5,2000,0.5,2.5],["hexcheck","10.4.1","555-1234","10001","X-300",0,-15.5,1,0.75]]},{"columns":["Event","Start","Deadline"],"container":"demo-dates","index":0,"isData":true,"types":["string","date","date"],"values":[["Kickoff","2024-04-03","2024-01-02"],["Review","2024-05-15","2024-05-06"],["Close","2024-07-06","2024-07-08"]]},{"columns":null,"container":"demo-layout","index":0,"isData":false,"types":null,"values":null},{"columns":["Quarter","Engineering","Sales"],"container":"demo-layout","index":1,"isData":true,"types":["string","number","number"],"values":[["Q1",42,18],["Q2",47,21],["Q3",51,26]]},{"columns":null,"container":"demo-layout","index":2,"isData":false,"types":null,"values":null}];
+(function(global){
+var __defs = {}, __cache = {};
+function require(name){
+  var key = String(name).replace(/^\.\//, '');
+  if (__cache[key]) return __cache[key].exports;
+  if (!__defs[key]) throw new Error('tablegrab: no module ' + key);
+  var module = { exports: {} };
+  __cache[key] = module;
+  __defs[key](module, module.exports, require);
+  return module.exports;
+}
+__defs['parse'] = function(module, exports, require){
+// A tolerant HTML table reader.
+//
+// The browser has a parser already, so this exists for node: the CLI, the tests and the
+// fixtures all need the same cell structure the DOM adapter produces. It reads tags with a
+// scanner rather than building a full document tree, because the only structure that matters
+// here is table / caption / section / row / cell.
+//
+// Implicit closes are the whole difficulty. Real pages, and Wikipedia in particular, write
+// `<tr><td>a<td>b` with no closing tags at all, so a cell ends when the next cell, row,
+// section or table starts.
+
+'use strict';
+
+const VOID_TAGS = new Set([
+  'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta',
+  'param', 'source', 'track', 'wbr',
+]);
+
+// Only these separate words. An inline tag does not: a browser renders `Rail<sup>[1]</sup>` as
+// "Rail[1]" with no space, and the two readers here have to agree with the browser and with
+// each other, because the same fixtures are checked through both.
+const BLOCK_TAGS = new Set([
+  'address', 'article', 'aside', 'blockquote', 'br', 'dd', 'div', 'dl', 'dt', 'figcaption',
+  'figure', 'footer', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hr', 'li', 'main', 'nav',
+  'ol', 'p', 'pre', 'section', 'table', 'td', 'th', 'tr', 'ul',
+]);
+
+const ENTITIES = {
+  amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: '\u00a0', ndash: '–',
+  mdash: '—', hellip: '…', pound: '£', euro: '€', yen: '¥',
+  cent: '¢', deg: '°', times: '×', minus: '−', laquo: '«',
+  raquo: '»', lsquo: '‘', rsquo: '’', ldquo: '“', rdquo: '”',
+  bull: '•', dagger: '†', copy: '©', reg: '®', trade: '™',
+  frac12: '½', frac14: '¼', sup2: '²', sup3: '³',
+};
+
+function decodeEntities(text) {
+  return text.replace(/&(#x[0-9a-fA-F]+|#\d+|[a-zA-Z][a-zA-Z0-9]*);/g, (whole, body) => {
+    if (body[0] === '#') {
+      const code = body[1] === 'x' || body[1] === 'X'
+        ? parseInt(body.slice(2), 16)
+        : parseInt(body.slice(1), 10);
+      if (!Number.isFinite(code) || code < 1 || code > 0x10ffff) return whole;
+      try {
+        return String.fromCodePoint(code);
+      } catch (err) {
+        return whole;
+      }
+    }
+    const key = body.toLowerCase();
+    return Object.prototype.hasOwnProperty.call(ENTITIES, key) ? ENTITIES[key] : whole;
+  });
+}
+
+// Collapse the way a browser lays text out: runs of whitespace become one space, and a
+// non-breaking space becomes an ordinary one so that "1 234" written with &nbsp; is still
+// readable as a number later.
+function collapse(text) {
+  return decodeEntities(text)
+    .replace(/\u00a0/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function parseAttributes(source) {
+  const attrs = {};
+  const pattern = /([a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*(?:=\s*("[^"]*"|'[^']*'|[^\s"'>]+))?/g;
+  let match;
+  while ((match = pattern.exec(source)) !== null) {
+    let value = match[2] === undefined ? '' : match[2];
+    if (value.length > 1 && (value[0] === '"' || value[0] === "'")) value = value.slice(1, -1);
+    attrs[match[1].toLowerCase()] = decodeEntities(value);
+  }
+  return attrs;
+}
+
+function spanOf(attrs, name) {
+  const raw = attrs[name];
+  if (raw === undefined) return 1;
+  const digits = String(raw).match(/\d+/);
+  if (!digits) return 1;
+  const value = parseInt(digits[0], 10);
+  // rowspan=0 means "to the end of this section" and is handled by the grid builder.
+  // colspan=0 was dropped from HTML and is treated as 1.
+  if (!Number.isFinite(value) || value < 0) return 1;
+  if (value > 1000) return 1000;
+  return value;
+}
+
+function newTable(attrs, depth) {
+  return {
+    attrs,
+    depth,
+    caption: '',
+    rows: [],
+    hasNestedTable: false,
+    thCount: 0,
+    tdCount: 0,
+    hasExplicitHead: false,
+  };
+}
+
+// Returns every table in the document, outermost first, each with its own cells only.
+// A cell that itself contains a table keeps its text but the inner table is a separate entry.
+function parseTables(html) {
+  const source = String(html).replace(/<!--[\s\S]*?-->/g, '');
+  const tables = [];
+  const stack = [];
+  let skipTag = null;
+  let captionOpen = false;
+  let pending = 0;
+
+  const top = () => (stack.length ? stack[stack.length - 1] : null);
+
+  function closeCell() {
+    const table = top();
+    if (!table || !table.openCell) return;
+    table.openCell.text = collapse(table.openCell.raw);
+    delete table.openCell.raw;
+    table.openCell = null;
+  }
+
+  function closeRow() {
+    const table = top();
+    if (!table) return;
+    closeCell();
+    table.openRow = null;
+  }
+
+  function addText(text) {
+    if (skipTag || !text) return;
+    const table = top();
+    if (!table) return;
+    if (captionOpen) {
+      table.caption += text;
+      return;
+    }
+    if (table.openCell) table.openCell.raw += text;
+  }
+
+  const tagPattern = /<(\/?)([a-zA-Z][a-zA-Z0-9]*)((?:"[^"]*"|'[^']*'|[^>])*)>/g;
+  let match;
+  while ((match = tagPattern.exec(source)) !== null) {
+    addText(source.slice(pending, match.index));
+    pending = tagPattern.lastIndex;
+
+    const closing = match[1] === '/';
+    const name = match[2].toLowerCase();
+    const rest = match[3] || '';
+
+    if (skipTag) {
+      if (closing && name === skipTag) skipTag = null;
+      continue;
+    }
+    if (!closing && (name === 'script' || name === 'style')) {
+      if (!/\/\s*$/.test(rest)) skipTag = name;
+      continue;
+    }
+
+    if (name === 'table') {
+      if (!closing) {
+        const parent = top();
+        if (parent) {
+          parent.hasNestedTable = true;
+          if (parent.openCell) parent.openCell.hasNestedTable = true;
+        }
+        const table = newTable(parseAttributes(rest), stack.length);
+        table.openRow = null;
+        table.openCell = null;
+        table.section = null;
+        tables.push(table);
+        stack.push(table);
+      } else if (stack.length) {
+        closeRow();
+        captionOpen = false;
+        stack.pop();
+      }
+      continue;
+    }
+
+    const table = top();
+    if (!table) continue;
+
+    if (name === 'caption') {
+      if (closing) captionOpen = false;
+      else {
+        closeCell();
+        captionOpen = true;
+      }
+      continue;
+    }
+    if (name === 'thead' || name === 'tbody' || name === 'tfoot') {
+      closeRow();
+      table.section = closing ? null : name;
+      if (!closing && name === 'thead') table.hasExplicitHead = true;
+      continue;
+    }
+    if (name === 'tr') {
+      closeRow();
+      if (!closing) {
+        table.openRow = { cells: [], section: table.section || 'tbody' };
+        table.rows.push(table.openRow);
+      }
+      continue;
+    }
+    if (name === 'th' || name === 'td') {
+      closeCell();
+      if (closing) continue;
+      if (!table.openRow) {
+        table.openRow = { cells: [], section: table.section || 'tbody' };
+        table.rows.push(table.openRow);
+      }
+      const attrs = parseAttributes(rest);
+      const cell = {
+        tag: name,
+        header: name === 'th',
+        colspan: Math.max(1, spanOf(attrs, 'colspan')),
+        rowspan: spanOf(attrs, 'rowspan'),
+        attrs,
+        raw: '',
+        text: '',
+        hasNestedTable: false,
+      };
+      if (name === 'th') table.thCount += 1;
+      else table.tdCount += 1;
+      table.openRow.cells.push(cell);
+      table.openCell = cell;
+      continue;
+    }
+    if (VOID_TAGS.has(name)) {
+      // An image or an input inside a cell carries no text. Its alt text is worth keeping.
+      if (name === 'img' && !closing) {
+        const attrs = parseAttributes(rest);
+        if (attrs.alt) addText(' ' + attrs.alt + ' ');
+        continue;
+      }
+      // br and hr are void and still break the line.
+      if (BLOCK_TAGS.has(name)) addText(' ');
+      continue;
+    }
+    // Any other tag. A block level one separates words, an inline one such as <a> or <sup>
+    // does not, which is what the browser does when it lays the cell out.
+    if (BLOCK_TAGS.has(name)) addText(' ');
+  }
+  addText(source.slice(pending));
+
+  for (const table of tables) {
+    if (table.openCell) {
+      table.openCell.text = collapse(table.openCell.raw);
+      delete table.openCell.raw;
+    }
+    delete table.openCell;
+    delete table.openRow;
+    delete table.section;
+    table.caption = collapse(table.caption);
+    for (const row of table.rows) {
+      for (const cell of row.cells) {
+        if (cell.raw !== undefined) {
+          cell.text = collapse(cell.raw);
+          delete cell.raw;
+        }
+      }
+    }
+  }
+  return tables;
+}
+
+// The text of one cell, given its inner HTML. The DOM adapter hands its cells through here so
+// that a cell reads the same whether it arrived as a string or as an element.
+function textFromHtml(html) {
+  const stripped = String(html)
+    .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, ' ')
+    .replace(/<!--[\s\S]*?-->/g, ' ');
+  const flattened = stripped.replace(
+    /<(\/?)([a-zA-Z][a-zA-Z0-9]*)((?:"[^"]*"|'[^']*'|[^>])*)>/g,
+    (whole, closing, name, rest) => {
+      const tag = name.toLowerCase();
+      if (tag === 'img' && !closing) {
+        const alt = parseAttributes(rest).alt;
+        return alt ? ` ${alt} ` : '';
+      }
+      return BLOCK_TAGS.has(tag) ? ' ' : '';
+    });
+  return collapse(flattened);
+}
+
+module.exports = { parseTables, collapse, decodeEntities, parseAttributes, textFromHtml, BLOCK_TAGS };
+
+};
+__defs['grid'] = function(module, exports, require){
+// Turn a parsed table into a rectangle.
+//
+// This is the part that is actually hard. A table with colspan and rowspan is a sparse
+// description of a grid, and every consumer downstream wants the dense one. The rules here
+// follow how a browser lays a table out:
+//
+//   * cells are placed left to right into the first free slot on their row,
+//   * a cell with rowspan occupies the slot in later rows too, so the row below starts
+//     further right than its own cell count suggests,
+//   * rowspan="0" runs to the end of its section,
+//   * sections render thead, then tbody, then tfoot, whatever order they were written in,
+//   * a row with too few cells leaves the tail of the rectangle empty rather than shifting.
+//
+// A merged cell's text is repeated into every slot it covers. That is the useful answer for
+// CSV and SQL, and the slot records whether it was the anchor so nothing has to guess later.
+
+'use strict';
+
+const SECTION_ORDER = { thead: 0, tbody: 1, tfoot: 2 };
+
+function orderRows(table) {
+  const numbered = table.rows.map((row, index) => ({ row, index }));
+  numbered.sort((a, b) => {
+    const left = SECTION_ORDER[a.row.section] === undefined ? 1 : SECTION_ORDER[a.row.section];
+    const right = SECTION_ORDER[b.row.section] === undefined ? 1 : SECTION_ORDER[b.row.section];
+    if (left !== right) return left - right;
+    return a.index - b.index;
+  });
+  return numbered.map((entry) => entry.row);
+}
+
+function sectionEnd(rows, start) {
+  const section = rows[start].section;
+  let end = start;
+  while (end + 1 < rows.length && rows[end + 1].section === section) end += 1;
+  return end;
+}
+
+function buildSlots(rows) {
+  const slots = [];
+  const notes = [];
+  const ensure = (r) => {
+    while (slots.length <= r) slots.push([]);
+    return slots[r];
+  };
+
+  for (let r = 0; r < rows.length; r += 1) {
+    const row = rows[r];
+    ensure(r);
+    let c = 0;
+    for (const cell of row.cells) {
+      while (slots[r][c] !== undefined) c += 1;
+      let rowspan = cell.rowspan;
+      if (rowspan === 0) {
+        rowspan = sectionEnd(rows, r) - r + 1;
+        notes.push(`row ${r} col ${c}: rowspan="0" expanded to ${rowspan} rows`);
+      }
+      rowspan = Math.max(1, Math.min(rowspan, rows.length - r));
+      const colspan = Math.max(1, cell.colspan);
+      for (let dr = 0; dr < rowspan; dr += 1) {
+        const target = ensure(r + dr);
+        for (let dc = 0; dc < colspan; dc += 1) {
+          if (target[c + dc] !== undefined) {
+            notes.push(`row ${r + dr} col ${c + dc}: overlapping spans, later cell dropped`);
+            continue;
+          }
+          target[c + dc] = {
+            text: cell.text,
+            header: cell.header,
+            anchor: dr === 0 && dc === 0,
+            anchorRow: r,
+            anchorCol: c,
+            rowspan,
+            colspan,
+            merged: rowspan > 1 || colspan > 1,
+            hasNestedTable: !!cell.hasNestedTable,
+          };
+        }
+      }
+      c += colspan;
+    }
+  }
+
+  let width = 0;
+  for (const row of slots) width = Math.max(width, row.length);
+  const ragged = [];
+  for (let r = 0; r < slots.length; r += 1) {
+    let filled = 0;
+    for (let c = 0; c < width; c += 1) {
+      if (slots[r][c] === undefined) {
+        slots[r][c] = {
+          text: '', header: false, anchor: true, anchorRow: r, anchorCol: c,
+          rowspan: 1, colspan: 1, merged: false, filler: true, hasNestedTable: false,
+        };
+      } else {
+        filled += 1;
+      }
+    }
+    if (filled < width) ragged.push({ row: r, filled, width });
+  }
+  return { slots, width, ragged, notes };
+}
+
+// How many rows at the top are header rows. An explicit thead wins. Without one, a leading run
+// of rows whose anchor cells are all th counts, which is what a hand-written table does.
+function headerRowCount(rows, slots) {
+  let explicit = 0;
+  while (explicit < rows.length && rows[explicit].section === 'thead') explicit += 1;
+  if (explicit > 0) return explicit;
+  let count = 0;
+  for (let r = 0; r < slots.length; r += 1) {
+    const anchors = slots[r].filter((slot) => slot.anchor && !slot.filler);
+    if (anchors.length === 0) break;
+    if (!anchors.every((slot) => slot.header)) break;
+    count += 1;
+  }
+  // Every row being a header usually means a grid of labels rather than a header block that
+  // deep, so only the first row is taken as the header and the rest become data.
+  if (count === slots.length && slots.length > 1) return 1;
+  return count;
+}
+
+function uniquify(names) {
+  const seen = new Map();
+  return names.map((name) => {
+    const count = seen.get(name) || 0;
+    seen.set(name, count + 1);
+    return count === 0 ? name : `${name}_${count + 1}`;
+  });
+}
+
+// Collapse a stack of header rows into one name per column. A header spanning two columns
+// repeats into both, so "Sales" over "2023" and "2024" becomes "Sales / 2023" and
+// "Sales / 2024". A header spanning two rows repeats downward, and repeating a name into
+// itself is noise, so consecutive duplicates collapse.
+function columnNames(slots, headerRows, width, separator) {
+  const names = [];
+  for (let c = 0; c < width; c += 1) {
+    const parts = [];
+    for (let r = 0; r < headerRows; r += 1) {
+      const slot = slots[r] && slots[r][c];
+      const text = slot && slot.text ? slot.text.trim() : '';
+      if (!text) continue;
+      if (parts.length && parts[parts.length - 1] === text) continue;
+      parts.push(text);
+    }
+    names.push(parts.length ? parts.join(separator) : `column_${c + 1}`);
+  }
+  return uniquify(names);
+}
+
+function buildGrid(table, options) {
+  const opts = options || {};
+  const separator = opts.separator === undefined ? ' / ' : opts.separator;
+  const rows = orderRows(table);
+  const { slots, width, ragged, notes } = buildSlots(rows);
+  const headerRows = opts.headerRows === undefined ? headerRowCount(rows, slots) : opts.headerRows;
+  const columns = columnNames(slots, headerRows, width, separator);
+
+  const bodyRows = [];
+  const footRows = [];
+  for (let r = headerRows; r < slots.length; r += 1) {
+    const values = [];
+    for (let c = 0; c < width; c += 1) values.push(slots[r][c].text);
+    if (rows[r] && rows[r].section === 'tfoot') footRows.push(bodyRows.length);
+    bodyRows.push(values);
+  }
+
+  return {
+    caption: table.caption || '',
+    width,
+    height: slots.length,
+    headerRows,
+    columns,
+    slots,
+    rows: bodyRows,
+    footRows,
+    ragged,
+    notes,
+    thCount: table.thCount,
+    tdCount: table.tdCount,
+    hasNestedTable: !!table.hasNestedTable,
+    attrs: table.attrs || {},
+    sections: rows.map((row) => row.section),
+  };
+}
+
+// The flat rectangle, header row included. Useful for tests and for eyeballing a fixture.
+function rectangle(grid) {
+  const out = [];
+  for (let r = 0; r < grid.height; r += 1) {
+    const line = [];
+    for (let c = 0; c < grid.width; c += 1) line.push(grid.slots[r][c].text);
+    out.push(line);
+  }
+  return out;
+}
+
+module.exports = { buildGrid, rectangle, orderRows, columnNames, headerRowCount };
+
+};
+__defs['infer'] = function(module, exports, require){
+// Type inference, and the refusals that matter more than the inferences.
+//
+// The classic failure of a tool like this is eating a leading zero: a zip code column arrives
+// as 7030, 2139, 10001 and nobody notices until a mailing goes out. So the guards come first
+// and they are absolute. A version string, a phone number, a part code and anything with a
+// leading zero stay text no matter how numeric they look.
+//
+// Everything else is decided per column rather than per cell, because one "n/a" in a column of
+// integers should not turn the whole column into text, and one unambiguous date is enough to
+// settle whether the ambiguous ones in the same column are day-first or month-first.
+
+'use strict';
+
+const NULLISH = new Set(['-', '–', '—', '?', 'n/a', 'na', 'n.a.', 'null', 'none', 'nil', '.']);
+
+const MONTHS = {
+  jan: 1, january: 1, feb: 2, february: 2, mar: 3, march: 3, apr: 4, april: 4,
+  may: 5, jun: 6, june: 6, jul: 7, july: 7, aug: 8, august: 8, sep: 9, sept: 9,
+  september: 9, oct: 10, october: 10, nov: 11, november: 11, dec: 12, december: 12,
+};
+
+const CURRENCY = {
+  $: 'USD', '€': 'EUR', '£': 'GBP', '¥': 'JPY', '₹': 'INR',
+  'us$': 'USD', 'a$': 'AUD', 'ca$': 'CAD', 'r$': 'BRL',
+  usd: 'USD', eur: 'EUR', gbp: 'GBP', jpy: 'JPY', inr: 'INR', chf: 'CHF',
+  cad: 'CAD', aud: 'AUD', brl: 'BRL',
+};
+
+const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+function isRealDate(y, m, d) {
+  if (!(y >= 1 && y <= 9999) || !(m >= 1 && m <= 12) || d < 1) return false;
+  let limit = DAYS_IN_MONTH[m - 1];
+  if (m === 2 && (y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0))) limit = 29;
+  return d <= limit;
+}
+
+const pad = (n) => String(n).padStart(2, '0');
+const iso = (y, m, d) => `${String(y).padStart(4, '0')}-${pad(m)}-${pad(d)}`;
+
+// A number written with separators. Every accepted shape is listed, and anything not listed is
+// text. Being permissive here is how "1.2.3" becomes 1.23.
+function parseDigits(body) {
+  const shapes = [
+    [/^(\d+)$/, (m) => Number(m[1])],
+    // 1,234,567 and 1,234,567.89 -- comma groups, dot decimal
+    [/^(\d{1,3}(?:,\d{3})+)$/, (m) => Number(m[1].replace(/,/g, ''))],
+    [/^(\d{1,3}(?:,\d{3})+)\.(\d+)$/, (m) => Number(`${m[1].replace(/,/g, '')}.${m[2]}`)],
+    // 1.234.567 and 1.234.567,89 -- the European convention, only when there are two or more
+    // groups. A single "1.234" is read as a decimal, which is the English reading.
+    [/^(\d{1,3}(?:\.\d{3}){2,})$/, (m) => Number(m[1].replace(/\./g, ''))],
+    [/^(\d{1,3}(?:\.\d{3})+),(\d+)$/, (m) => Number(`${m[1].replace(/\./g, '')}.${m[2]}`)],
+    // 1 234 567, the separator Wikipedia and most of Europe use
+    [/^(\d{1,3}(?: \d{3})+)$/, (m) => Number(m[1].replace(/ /g, ''))],
+    [/^(\d{1,3}(?: \d{3})+)[.,](\d+)$/, (m) => Number(`${m[1].replace(/ /g, '')}.${m[2]}`)],
+    // plain decimals, either separator
+    [/^(\d+)\.(\d+)$/, (m) => Number(`${m[1]}.${m[2]}`)],
+    // 1,5 is a decimal comma; 1,234 is a thousands group. Three digits after the comma is the
+    // grouping reading, which is the common case in English documents.
+    [/^(\d+),(\d{3})$/, (m) => Number(m[1] + m[2])],
+    [/^(\d+),(\d{1,2}|\d{4,})$/, (m) => Number(`${m[1]}.${m[2]}`)],
+  ];
+  for (const [pattern, build] of shapes) {
+    const match = body.match(pattern);
+    if (match) {
+      const value = build(match);
+      if (Number.isFinite(value)) return value;
+    }
+  }
+  return null;
+}
+
+function parseNumber(text) {
+  let s = text;
+  let negative = false;
+  let currency = null;
+  let percent = false;
+
+  const bracketed = s.match(/^\((.*)\)$/);
+  if (bracketed) {
+    negative = true;
+    s = bracketed[1].trim();
+  }
+  const lead = s.match(/^(US\$|A\$|CA\$|R\$|[$€£¥₹]|USD|EUR|GBP|JPY|INR|CHF|CAD|AUD|BRL)\s*/i);
+  if (lead) {
+    currency = CURRENCY[lead[1].toLowerCase()] || null;
+    s = s.slice(lead[0].length);
+  }
+  const trail = s.match(/\s*(USD|EUR|GBP|JPY|INR|CHF|CAD|AUD|BRL|[$€£¥₹])$/i);
+  if (trail) {
+    if (!currency) currency = CURRENCY[trail[1].toLowerCase()] || null;
+    s = s.slice(0, s.length - trail[0].length);
+  }
+  s = s.trim();
+  if (s.endsWith('%')) {
+    percent = true;
+    s = s.slice(0, -1).trim();
+  }
+  const sign = s.match(/^([+\-−])\s*/);
+  if (sign) {
+    if (sign[1] !== '+') negative = !negative;
+    s = s.slice(sign[0].length).trim();
+  }
+  if (s === '') return null;
+  // Anything outside digits and the three separators is text. This is the line that keeps
+  // "555-0134", "1,234-5,678" and "12 items" out.
+  if (!/^\d[\d., ]*$/.test(s)) return null;
+  // The leading zero guard. "0" and "0.5" are numbers, "007" and "07030" are identifiers.
+  if (/^0\d/.test(s)) return null;
+
+  const value = parseDigits(s);
+  if (value === null) return null;
+  return {
+    type: 'number',
+    value: negative ? -value : value,
+    integer: Number.isInteger(negative ? -value : value),
+    currency,
+    percent,
+    raw: text,
+  };
+}
+
+function monthNumber(word) {
+  const key = word.toLowerCase().replace(/\.$/, '');
+  return Object.prototype.hasOwnProperty.call(MONTHS, key) ? MONTHS[key] : null;
+}
+
+function parseDate(text, options) {
+  const opts = options || {};
+  const dayFirstDefault = !!opts.dayFirst;
+  const s = text.trim();
+  let m;
+
+  if ((m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/))) {
+    const [y, mo, d] = [+m[1], +m[2], +m[3]];
+    if (!isRealDate(y, mo, d)) return null;
+    return { type: 'date', value: iso(y, mo, d), format: 'iso', ambiguous: false, alt: null, raw: text };
+  }
+  if ((m = s.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/))) {
+    const [y, mo, d] = [+m[1], +m[2], +m[3]];
+    if (!isRealDate(y, mo, d)) return null;
+    return { type: 'date', value: iso(y, mo, d), format: 'ymd', ambiguous: false, alt: null, raw: text };
+  }
+  // Numeric day and month with a four digit year. This is the ambiguous family.
+  if ((m = s.match(/^(\d{1,2})([/.\-])(\d{1,2})\2(\d{4})$/))) {
+    const a = +m[1];
+    const b = +m[3];
+    const y = +m[4];
+    const dmy = isRealDate(y, b, a);
+    const mdy = isRealDate(y, a, b);
+    if (dmy && mdy) {
+      const first = dayFirstDefault ? iso(y, b, a) : iso(y, a, b);
+      const second = dayFirstDefault ? iso(y, a, b) : iso(y, b, a);
+      return {
+        type: 'date',
+        value: first,
+        format: dayFirstDefault ? 'dmy' : 'mdy',
+        ambiguous: true,
+        alt: second,
+        raw: text,
+      };
+    }
+    if (dmy) return { type: 'date', value: iso(y, b, a), format: 'dmy', ambiguous: false, alt: null, raw: text };
+    if (mdy) return { type: 'date', value: iso(y, a, b), format: 'mdy', ambiguous: false, alt: null, raw: text };
+    return null;
+  }
+  // 3 March 2026, 3rd March 2026, 3 Mar. 2026
+  if ((m = s.match(/^(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3,9}\.?),?\s+(\d{4})$/))) {
+    const mo = monthNumber(m[2]);
+    if (mo === null || !isRealDate(+m[3], mo, +m[1])) return null;
+    return { type: 'date', value: iso(+m[3], mo, +m[1]), format: 'month-name', ambiguous: false, alt: null, raw: text };
+  }
+  // March 3, 2026 and Mar 3 2026
+  if ((m = s.match(/^([A-Za-z]{3,9}\.?)\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})$/))) {
+    const mo = monthNumber(m[1]);
+    if (mo === null || !isRealDate(+m[3], mo, +m[2])) return null;
+    return { type: 'date', value: iso(+m[3], mo, +m[2]), format: 'month-name', ambiguous: false, alt: null, raw: text };
+  }
+  return null;
+}
+
+function inferValue(raw, options) {
+  const text = String(raw === null || raw === undefined ? '' : raw).trim();
+  if (text === '' || NULLISH.has(text.toLowerCase())) {
+    return { type: 'empty', value: null, raw: text };
+  }
+  const date = parseDate(text, options);
+  if (date) return date;
+  const number = parseNumber(text);
+  if (number) return number;
+  return { type: 'string', value: text, raw: text };
+}
+
+// One column at a time. A mixed column is text, because half-typed data is worse than none.
+function inferColumn(values, options) {
+  const cells = values.map((value) => inferValue(value, options));
+  const present = cells.filter((cell) => cell.type !== 'empty');
+  const warnings = [];
+
+  if (present.length === 0) {
+    return { type: 'string', cells, warnings, integer: false, currency: null, percent: false };
+  }
+  if (present.every((cell) => cell.type === 'number')) {
+    const currencies = new Set(present.map((cell) => cell.currency).filter(Boolean));
+    if (currencies.size > 1) warnings.push(`mixed currencies: ${[...currencies].sort().join(', ')}`);
+    return {
+      type: 'number',
+      cells,
+      warnings,
+      integer: present.every((cell) => cell.integer),
+      currency: currencies.size === 1 ? [...currencies][0] : null,
+      percent: present.every((cell) => cell.percent),
+    };
+  }
+  if (present.every((cell) => cell.type === 'date')) {
+    const evidence = new Set(present.filter((cell) => !cell.ambiguous).map((cell) => cell.format));
+    const ambiguous = present.filter((cell) => cell.ambiguous);
+    if (ambiguous.length) {
+      let dayFirst = null;
+      if (evidence.has('dmy') && !evidence.has('mdy')) dayFirst = true;
+      else if (evidence.has('mdy') && !evidence.has('dmy')) dayFirst = false;
+      if (dayFirst === null) {
+        warnings.push(
+          `${ambiguous.length} ambiguous date(s) such as ${ambiguous[0].raw} and nothing in the `
+          + `column settles day-first or month-first; read as ${ambiguous[0].format}`);
+      } else {
+        for (const cell of cells) {
+          if (cell.type === 'date' && cell.ambiguous) {
+            const wanted = dayFirst ? 'dmy' : 'mdy';
+            if (cell.format !== wanted) {
+              const swapped = cell.alt;
+              cell.alt = cell.value;
+              cell.value = swapped;
+              cell.format = wanted;
+            }
+            cell.resolvedBy = 'column';
+          }
+        }
+        warnings.push(`${ambiguous.length} ambiguous date(s) read as `
+          + `${dayFirst ? 'day-first' : 'month-first'} from the rest of the column`);
+      }
+    }
+    return { type: 'date', cells, warnings, integer: false, currency: null, percent: false };
+  }
+  // A mixed column is a text column, and that has to reach the individual cells. A ZIP column
+  // holding 07030, 02139 and 10001 is the case: the first two are text by the leading zero
+  // guard, and leaving the third as the number 10001 puts two types in one JSON field.
+  const mixed = new Set(present.map((cell) => cell.type));
+  for (const cell of cells) {
+    if (cell.type !== 'empty' && cell.type !== 'string') {
+      cell.coercedFrom = cell.type;
+      cell.type = 'string';
+      cell.value = cell.raw;
+    }
+  }
+  if (mixed.size > 1) warnings.push(`mixed cell types (${[...mixed].sort().join(', ')}), kept as text`);
+  return { type: 'string', cells, warnings, integer: false, currency: null, percent: false };
+}
+
+// The typed view of a grid: one entry per column, and the rows re-emitted as typed values.
+function analyse(grid, options) {
+  const columns = [];
+  for (let c = 0; c < grid.width; c += 1) {
+    const raw = grid.rows.map((row) => row[c]);
+    const inferred = inferColumn(raw, options);
+    let label = grid.columns[c];
+    if (inferred.type === 'number' && inferred.currency) label += ` (${inferred.currency})`;
+    else if (inferred.type === 'number' && inferred.percent) label += ' (%)';
+    columns.push({
+      name: grid.columns[c],
+      label,
+      type: inferred.type,
+      integer: inferred.integer,
+      currency: inferred.currency,
+      percent: inferred.percent,
+      warnings: inferred.warnings,
+      cells: inferred.cells,
+    });
+  }
+  const rows = grid.rows.map((_, r) => columns.map((column) => column.cells[r]));
+  return { columns, rows, caption: grid.caption || '' };
+}
+
+module.exports = { inferValue, inferColumn, analyse, parseNumber, parseDate, NULLISH };
+
+};
+__defs['detect'] = function(module, exports, require){
+// Is this a table of data, or a table being used to lay out a page?
+//
+// Old pages, and most HTML email, nest tables to position things. Exporting one of those as CSV
+// produces a file that looks like data and is not, which is worse than refusing. So this scores
+// the structural signals and refuses below a threshold. The caller can override with force,
+// because a heuristic that cannot be overridden is a bug in someone's afternoon.
+
+'use strict';
+
+const PRESENTATION_ROLES = new Set(['presentation', 'none']);
+
+function classify(grid) {
+  const reasons = [];
+  let score = 0;
+
+  const role = String((grid.attrs && grid.attrs.role) || '').toLowerCase();
+  if (PRESENTATION_ROLES.has(role)) {
+    score += 5;
+    reasons.push(`role="${role}" says outright that this is layout`);
+  }
+  if (grid.hasNestedTable) {
+    score += 3;
+    reasons.push('contains a nested table, which data tables almost never do');
+  }
+  if (grid.thCount === 0) {
+    score += 1;
+    reasons.push('no th cells anywhere');
+  }
+  if (grid.height < 2) {
+    score += 3;
+    reasons.push(`only ${grid.height} row(s)`);
+  }
+  if (grid.width < 2) {
+    score += 2;
+    reasons.push(`only ${grid.width} column(s)`);
+  }
+  const attrs = grid.attrs || {};
+  const legacy = ['border', 'cellpadding', 'cellspacing', 'align', 'bgcolor']
+    .filter((name) => attrs[name] !== undefined);
+  if (legacy.length >= 2 && grid.thCount === 0) {
+    score += 2;
+    reasons.push(`legacy layout attributes (${legacy.join(', ')}) and no header cells`);
+  }
+  if (grid.headerRows === 0 && grid.thCount === 0 && !grid.caption) {
+    score += 1;
+    reasons.push('no caption, no thead and no header cells, so nothing names the columns');
+  }
+  const texts = [];
+  for (let r = 0; r < grid.height; r += 1) {
+    for (let c = 0; c < grid.width; c += 1) texts.push(grid.slots[r][c].text);
+  }
+  const longest = texts.reduce((best, text) => Math.max(best, text.length), 0);
+  if (longest > 400) {
+    score += 2;
+    reasons.push(`a cell holds ${longest} characters, which reads as page copy`);
+  }
+  if (grid.caption) {
+    score -= 1;
+    reasons.push('has a caption, which is a data table signal');
+  }
+  if (grid.headerRows > 0) {
+    score -= 1;
+    reasons.push('has a header row, which is a data table signal');
+  }
+
+  return { isData: score < 3, score, reasons };
+}
+
+module.exports = { classify };
+
+};
+__defs['emit'] = function(module, exports, require){
+// The four output formats. All of them read the typed analysis, so a number is a number in
+// every one of them and the thousands separator is gone exactly once.
+
+'use strict';
+
+const SQL_TYPES = { date: 'DATE', string: 'TEXT' };
+
+function cellText(cell) {
+  if (!cell || cell.type === 'empty') return '';
+  if (cell.type === 'number') return String(cell.value);
+  if (cell.type === 'date') return cell.value;
+  return cell.raw;
+}
+
+function csvField(text, delimiter) {
+  const needsQuote = text.includes(delimiter) || text.includes('"') || /[\r\n]/.test(text)
+    || text !== text.trim();
+  return needsQuote ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function toCSV(analysis, options) {
+  const opts = options || {};
+  const delimiter = opts.delimiter || ',';
+  const newline = opts.newline || '\n';
+  const lines = [analysis.columns.map((column) => csvField(column.label, delimiter)).join(delimiter)];
+  for (const row of analysis.rows) {
+    lines.push(row.map((cell) => csvField(cellText(cell), delimiter)).join(delimiter));
+  }
+  return lines.join(newline) + newline;
+}
+
+function toJSON(analysis, options) {
+  const opts = options || {};
+  const records = analysis.rows.map((row) => {
+    const record = {};
+    row.forEach((cell, index) => {
+      const column = analysis.columns[index];
+      if (!cell || cell.type === 'empty') record[column.label] = null;
+      else if (cell.type === 'number') record[column.label] = cell.value;
+      else if (cell.type === 'date') record[column.label] = cell.value;
+      else record[column.label] = cell.raw;
+    });
+    return record;
+  });
+  return JSON.stringify(records, null, opts.indent === undefined ? 2 : opts.indent) + '\n';
+}
+
+function mdCell(text) {
+  return text.replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
+}
+
+function toMarkdown(analysis) {
+  const head = `| ${analysis.columns.map((column) => mdCell(column.label)).join(' | ')} |`;
+  const rule = `| ${analysis.columns.map((column) => (column.type === 'number' ? '---:' : '---')).join(' | ')} |`;
+  const body = analysis.rows.map(
+    (row) => `| ${row.map((cell) => mdCell(cellText(cell))).join(' | ')} |`);
+  return [head, rule, ...body].join('\n') + '\n';
+}
+
+function identifier(name, index) {
+  let out = String(name).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  if (!out) out = `column_${index + 1}`;
+  if (/^\d/.test(out)) out = `c_${out}`;
+  return out.slice(0, 63);
+}
+
+function uniqueIdentifiers(names) {
+  const seen = new Map();
+  return names.map((name, index) => {
+    const base = identifier(name, index);
+    const count = seen.get(base) || 0;
+    seen.set(base, count + 1);
+    return count === 0 ? base : `${base}_${count + 1}`;
+  });
+}
+
+function sqlLiteral(cell) {
+  if (!cell || cell.type === 'empty') return 'NULL';
+  if (cell.type === 'number') return String(cell.value);
+  const text = cell.type === 'date' ? cell.value : cell.raw;
+  return `'${text.replace(/'/g, "''")}'`;
+}
+
+function sqlType(column) {
+  if (column.type === 'number') return column.integer ? 'INTEGER' : 'REAL';
+  return SQL_TYPES[column.type] || 'TEXT';
+}
+
+function toSQL(analysis, options) {
+  const opts = options || {};
+  const table = identifier(opts.table || analysis.caption || 'grabbed_table', 0);
+  const names = uniqueIdentifiers(analysis.columns.map((column) => column.name));
+  const widest = names.reduce((best, name) => Math.max(best, name.length), 0);
+  const definitions = names.map(
+    (name, index) => `  "${name}"${' '.repeat(widest - name.length)} ${sqlType(analysis.columns[index])}`);
+  const create = `CREATE TABLE "${table}" (\n${definitions.join(',\n')}\n);`;
+  if (!analysis.rows.length) return create + '\n';
+  const tuples = analysis.rows.map(
+    (row) => `  (${row.map((cell) => sqlLiteral(cell)).join(', ')})`);
+  const insert = `INSERT INTO "${table}" (${names.map((name) => `"${name}"`).join(', ')}) VALUES\n`
+    + `${tuples.join(',\n')};`;
+  return `${create}\n${insert}\n`;
+}
+
+const FORMATS = { csv: toCSV, json: toJSON, md: toMarkdown, markdown: toMarkdown, sql: toSQL };
+
+function emit(analysis, format, options) {
+  const fn = FORMATS[String(format).toLowerCase()];
+  if (!fn) throw new Error(`unknown format: ${format}`);
+  return fn(analysis, options);
+}
+
+module.exports = { toCSV, toJSON, toMarkdown, toSQL, emit, identifier, uniqueIdentifiers, cellText };
+
+};
+__defs['dom'] = function(module, exports, require){
+// Read a live DOM table into the same structure the string parser produces, so the grid,
+// inference and emitters cannot tell where a table came from.
+
+'use strict';
+
+const { collapse, textFromHtml } = require('./parse');
+
+function attrsOf(element) {
+  const attrs = {};
+  const list = element.attributes || [];
+  for (let i = 0; i < list.length; i += 1) attrs[list[i].name.toLowerCase()] = list[i].value;
+  return attrs;
+}
+
+function spanOf(element, name) {
+  const raw = element.getAttribute(name);
+  if (raw === null || raw === undefined) return 1;
+  const digits = String(raw).match(/\d+/);
+  if (!digits) return 1;
+  const value = parseInt(digits[0], 10);
+  if (!Number.isFinite(value) || value < 0) return 1;
+  return Math.min(value, 1000);
+}
+
+function sectionOf(row) {
+  let node = row.parentNode;
+  while (node && node.nodeType === 1) {
+    const tag = node.tagName.toLowerCase();
+    if (tag === 'thead' || tag === 'tbody' || tag === 'tfoot') return tag;
+    if (tag === 'table') break;
+    node = node.parentNode;
+  }
+  return 'tbody';
+}
+
+function nearestTable(node) {
+  let current = node.parentNode;
+  while (current && current.nodeType === 1) {
+    if (current.tagName.toLowerCase() === 'table') return current;
+    current = current.parentNode;
+  }
+  return null;
+}
+
+// A nested table's cells belong to the nested table, so they are removed before the text is
+// read. The rest goes through the same flattener the string parser uses, rather than through
+// textContent, so that an inline tag and a block tag are treated the same way in both.
+function cellText(cell) {
+  const clone = cell.cloneNode(true);
+  const drop = clone.querySelectorAll ? clone.querySelectorAll('script,style,table') : [];
+  for (let i = 0; i < drop.length; i += 1) {
+    if (drop[i].parentNode) drop[i].parentNode.removeChild(drop[i]);
+  }
+  if (typeof clone.innerHTML === 'string') return textFromHtml(clone.innerHTML);
+  return collapse(clone.textContent || '');
+}
+
+// Only the cells that belong to this table, so a nested table's cells stay with the nested one.
+function fromDom(table) {
+  const rows = [];
+  let thCount = 0;
+  let tdCount = 0;
+  let hasNestedTable = !!(table.querySelector && table.querySelector('table'));
+  let hasExplicitHead = !!(table.querySelector && table.querySelector('thead'));
+
+  const allRows = table.querySelectorAll('tr');
+  for (let i = 0; i < allRows.length; i += 1) {
+    const row = allRows[i];
+    if (nearestTable(row) !== table) continue;
+    const record = { cells: [], section: sectionOf(row) };
+    for (let j = 0; j < row.children.length; j += 1) {
+      const cell = row.children[j];
+      const tag = cell.tagName ? cell.tagName.toLowerCase() : '';
+      if (tag !== 'th' && tag !== 'td') continue;
+      if (tag === 'th') thCount += 1;
+      else tdCount += 1;
+      record.cells.push({
+        tag,
+        header: tag === 'th',
+        colspan: Math.max(1, spanOf(cell, 'colspan')),
+        rowspan: spanOf(cell, 'rowspan'),
+        attrs: attrsOf(cell),
+        text: cellText(cell),
+        hasNestedTable: !!(cell.querySelector && cell.querySelector('table')),
+      });
+    }
+    rows.push(record);
+  }
+
+  const caption = table.querySelector('caption');
+  return {
+    attrs: attrsOf(table),
+    depth: 0,
+    caption: caption && nearestTable(caption) === table ? collapse(caption.textContent || '') : '',
+    rows,
+    hasNestedTable,
+    thCount,
+    tdCount,
+    hasExplicitHead,
+  };
+}
+
+module.exports = { fromDom, cellText };
+
+};
+__defs['ui'] = function(module, exports, require){
+// The bookmarklet's on-page half: hover to highlight a table, click to export it.
+//
+// Everything is inline styled and scoped to one container, because this runs on somebody
+// else's page and has no business touching their stylesheet.
+
+'use strict';
+
+const { fromDom } = require('./dom');
+const { buildGrid } = require('./grid');
+const { analyse } = require('./infer');
+const { classify } = require('./detect');
+const { emit } = require('./emit');
+
+const PANEL_ID = 'tablegrab-panel';
+const HIGHLIGHT = '2px solid #d6482f';
+const FORMATS = [['csv', 'CSV'], ['json', 'JSON'], ['md', 'Markdown'], ['sql', 'SQL']];
+
+function style(element, rules) {
+  for (const key of Object.keys(rules)) element.style[key] = rules[key];
+  return element;
+}
+
+function make(tag, rules, text) {
+  const element = document.createElement(tag);
+  if (rules) style(element, rules);
+  if (text !== undefined) element.textContent = text;
+  return element;
+}
+
+function activate(options) {
+  const opts = options || {};
+  const root = opts.root || document;
+  if (document.getElementById(PANEL_ID)) return null;
+
+  const state = { hovered: null, table: null, format: 'csv', force: false, saved: '' };
+
+  const panel = make('div', {
+    position: 'fixed', right: '12px', bottom: '12px', width: 'min(560px, calc(100vw - 24px))',
+    maxHeight: '70vh', zIndex: '2147483647', background: '#fff', color: '#191a1c',
+    border: '1px solid #c9c9c9', borderRadius: '8px', boxShadow: '0 8px 30px rgba(0,0,0,.25)',
+    font: '13px/1.45 ui-sans-serif, system-ui, sans-serif', display: 'flex',
+    flexDirection: 'column', overflow: 'hidden',
+  });
+  panel.id = PANEL_ID;
+
+  const head = style(make('div'), {
+    display: 'flex', gap: '6px', alignItems: 'center', padding: '8px 10px',
+    borderBottom: '1px solid #e4e4e4', flexWrap: 'wrap',
+  });
+  const title = make('strong', { marginRight: 'auto' }, 'tablegrab');
+  head.appendChild(title);
+
+  const buttons = {};
+  for (const [key, label] of FORMATS) {
+    const button = make('button', {
+      font: 'inherit', padding: '3px 9px', borderRadius: '5px', cursor: 'pointer',
+      border: '1px solid #c9c9c9', background: '#f4f4f4',
+    }, label);
+    button.addEventListener('click', () => {
+      state.format = key;
+      render();
+    });
+    buttons[key] = button;
+    head.appendChild(button);
+  }
+  const close = make('button', {
+    font: 'inherit', padding: '3px 9px', borderRadius: '5px', cursor: 'pointer',
+    border: '1px solid #c9c9c9', background: '#f4f4f4',
+  }, 'Close');
+  close.addEventListener('click', () => deactivate());
+  head.appendChild(close);
+
+  const status = style(make('div'), {
+    padding: '6px 10px', color: '#5d626a', borderBottom: '1px solid #e4e4e4',
+  });
+  status.textContent = 'Hover a table, then click it.';
+
+  const output = make('textarea');
+  style(output, {
+    flex: '1', minHeight: '160px', margin: '0', padding: '10px', border: '0',
+    resize: 'vertical', font: '12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace',
+    outline: 'none', background: '#fbfaf8', color: '#191a1c', whiteSpace: 'pre',
+  });
+  output.setAttribute('readonly', 'readonly');
+  output.id = 'tablegrab-output';
+
+  const foot = style(make('div'), {
+    display: 'flex', gap: '6px', padding: '8px 10px', borderTop: '1px solid #e4e4e4',
+  });
+  const copy = make('button', {
+    font: 'inherit', padding: '3px 9px', borderRadius: '5px', cursor: 'pointer',
+    border: '1px solid #c9c9c9', background: '#f4f4f4',
+  }, 'Copy');
+  copy.addEventListener('click', () => {
+    output.removeAttribute('readonly');
+    output.select();
+    let ok = false;
+    try {
+      ok = document.execCommand('copy');
+    } catch (err) {
+      ok = false;
+    }
+    output.setAttribute('readonly', 'readonly');
+    copy.textContent = ok ? 'Copied' : 'Select and copy';
+  });
+  const download = make('button', {
+    font: 'inherit', padding: '3px 9px', borderRadius: '5px', cursor: 'pointer',
+    border: '1px solid #c9c9c9', background: '#f4f4f4',
+  }, 'Download');
+  download.addEventListener('click', () => {
+    const extension = state.format === 'md' ? 'md' : state.format;
+    const blob = new Blob([output.value], { type: 'text/plain;charset=utf-8' });
+    const link = make('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `table.${extension}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+  });
+  const forceLabel = style(make('label'), { marginLeft: 'auto', color: '#5d626a' });
+  const forceBox = make('input');
+  forceBox.type = 'checkbox';
+  forceBox.addEventListener('change', () => {
+    state.force = forceBox.checked;
+    render();
+  });
+  forceLabel.appendChild(forceBox);
+  forceLabel.appendChild(document.createTextNode(' export anyway'));
+
+  foot.appendChild(copy);
+  foot.appendChild(download);
+  foot.appendChild(forceLabel);
+
+  panel.appendChild(head);
+  panel.appendChild(status);
+  panel.appendChild(output);
+  panel.appendChild(foot);
+  document.body.appendChild(panel);
+
+  function highlight(table) {
+    if (state.hovered === table) return;
+    if (state.hovered && state.hovered !== state.table) {
+      state.hovered.style.outline = state.hovered.getAttribute('data-tablegrab-outline') || '';
+    }
+    state.hovered = table;
+    if (table && table !== state.table) {
+      table.setAttribute('data-tablegrab-outline', table.style.outline || '');
+      table.style.outline = '2px dashed #d6482f';
+    }
+  }
+
+  function nearestTable(node) {
+    let current = node;
+    while (current && current !== document.body) {
+      if (current.tagName && current.tagName.toLowerCase() === 'table') return current;
+      current = current.parentNode;
+    }
+    return null;
+  }
+
+  function onOver(event) {
+    if (panel.contains(event.target)) return;
+    highlight(nearestTable(event.target));
+  }
+
+  function onClick(event) {
+    if (panel.contains(event.target)) return;
+    const table = nearestTable(event.target);
+    if (!table) return;
+    event.preventDefault();
+    event.stopPropagation();
+    select(table);
+  }
+
+  function onKey(event) {
+    if (event.key === 'Escape') deactivate();
+  }
+
+  function select(table) {
+    if (state.table && state.table !== table) state.table.style.outline = '';
+    state.table = table;
+    table.style.outline = HIGHLIGHT;
+    render();
+  }
+
+  function render() {
+    for (const [key] of FORMATS) {
+      buttons[key].style.background = key === state.format ? '#191a1c' : '#f4f4f4';
+      buttons[key].style.color = key === state.format ? '#fff' : '#191a1c';
+    }
+    copy.textContent = 'Copy';
+    if (!state.table) {
+      output.value = '';
+      status.textContent = 'Hover a table, then click it.';
+      return;
+    }
+    const grid = buildGrid(fromDom(state.table), opts);
+    const verdict = classify(grid);
+    if (!verdict.isData && !state.force) {
+      output.value = '';
+      status.textContent = `Refused: this looks like a layout table (score ${verdict.score}). `
+        + `${verdict.reasons.join('; ')}.`;
+      return;
+    }
+    const analysis = analyse(grid, opts);
+    output.value = emit(analysis, state.format, opts);
+    const warnings = analysis.columns
+      .filter((column) => column.warnings.length)
+      .map((column) => `${column.name}: ${column.warnings.join('; ')}`)
+      .concat(grid.notes)
+      .concat(grid.ragged.length ? [`${grid.ragged.length} short row(s) padded`] : []);
+    status.textContent = `${grid.height} x ${grid.width}, ${grid.headerRows} header row(s), `
+      + `${analysis.rows.length} data rows. ${warnings.join(' | ') || 'No warnings.'}`;
+  }
+
+  function deactivate() {
+    root.removeEventListener('mouseover', onOver, true);
+    root.removeEventListener('click', onClick, true);
+    document.removeEventListener('keydown', onKey, true);
+    if (state.hovered) state.hovered.style.outline = '';
+    if (state.table) state.table.style.outline = '';
+    if (panel.parentNode) panel.parentNode.removeChild(panel);
+  }
+
+  root.addEventListener('mouseover', onOver, true);
+  root.addEventListener('click', onClick, true);
+  document.addEventListener('keydown', onKey, true);
+
+  return { select, render, deactivate, state, panel };
+}
+
+module.exports = { activate, PANEL_ID };
+
+};
+__defs['index'] = function(module, exports, require){
+'use strict';
+
+const { parseTables, collapse } = require('./parse');
+const { buildGrid, rectangle } = require('./grid');
+const { analyse, inferValue, inferColumn } = require('./infer');
+const { classify } = require('./detect');
+const { emit, toCSV, toJSON, toMarkdown, toSQL } = require('./emit');
+const { fromDom } = require('./dom');
+
+// One table, from parsed cells to a finished export.
+function grabTable(table, options) {
+  const opts = options || {};
+  const grid = buildGrid(table, opts);
+  const verdict = classify(grid);
+  if (!verdict.isData && !opts.force) {
+    const error = new Error(
+      `refused: this looks like a layout table (score ${verdict.score}). `
+      + `${verdict.reasons.join('; ')}. Pass force to export it anyway.`);
+    error.verdict = verdict;
+    error.grid = grid;
+    throw error;
+  }
+  const analysis = analyse(grid, opts);
+  return { grid, analysis, verdict, output: opts.format ? emit(analysis, opts.format, opts) : null };
+}
+
+// Every table in a document, in source order.
+function grab(html, options) {
+  const opts = options || {};
+  const tables = parseTables(html);
+  if (opts.index !== undefined) {
+    if (!tables[opts.index]) throw new Error(`no table at index ${opts.index} (found ${tables.length})`);
+    return grabTable(tables[opts.index], opts);
+  }
+  return tables.map((table) => {
+    try {
+      return grabTable(table, opts);
+    } catch (err) {
+      return { error: String(err.message), verdict: err.verdict || null, grid: err.grid || null };
+    }
+  });
+}
+
+module.exports = {
+  parseTables, fromDom, buildGrid, rectangle, analyse, inferValue, inferColumn,
+  classify, emit, toCSV, toJSON, toMarkdown, toSQL, grab, grabTable, collapse,
+};
+
+};
+var api = require('index');
+api.activate = require('ui').activate;
+global.TableGrab = api;
+})(typeof window !== 'undefined' ? window : this);
+
+
+(function(){
+  var report = document.getElementById('selftest');
+  var lines = [], ok = 0, fail = 0;
+  function same(a, b){ return JSON.stringify(a) === JSON.stringify(b); }
+  EXPECT.forEach(function(spec){
+    var name = spec.container + '#' + spec.index;
+    try {
+      var tables = document.querySelectorAll('#' + spec.container + ' table');
+      var table = tables[spec.index];
+      if (!table) throw new Error('no table');
+      var grid = TableGrab.buildGrid(TableGrab.fromDom(table), {});
+      var verdict = TableGrab.classify(grid);
+      var problems = [];
+      if (verdict.isData !== spec.isData) problems.push('verdict ' + verdict.isData);
+      if (spec.columns) {
+        var analysis = TableGrab.analyse(grid, {});
+        var values = analysis.rows.map(function(row){
+          return row.map(function(cell){ return cell.type === 'empty' ? null : cell.value; });
+        });
+        if (!same(grid.columns, spec.columns)) problems.push('columns ' + JSON.stringify(grid.columns));
+        if (!same(analysis.columns.map(function(c){ return c.type; }), spec.types)) {
+          problems.push('types ' + JSON.stringify(analysis.columns.map(function(c){ return c.type; })));
+        }
+        if (!same(values, spec.values)) problems.push('values ' + JSON.stringify(values));
+      }
+      if (problems.length) { fail++; lines.push('FAIL ' + name + ': ' + problems.join(' | ')); }
+      else { ok++; lines.push('ok   ' + name + ' ' + grid.height + 'x' + grid.width
+        + ' header=' + grid.headerRows); }
+    } catch (err) {
+      fail++;
+      lines.push('FAIL ' + name + ': ' + (err && err.message ? err.message : err));
+    }
+  });
+  // Anything escaping the page sideways, measured rather than eyeballed. Content scrolling
+  // inside its own container is correct, so those subtrees are skipped.
+  var docWidth = document.documentElement.clientWidth;
+  var offenders = [];
+  var all = document.querySelectorAll('body *');
+  for (var i = 0; i < all.length; i++) {
+    var node = all[i], scrolls = false, up = node.parentNode;
+    while (up && up.nodeType === 1 && up !== document.body) {
+      var flow = getComputedStyle(up).overflowX;
+      if (flow === 'auto' || flow === 'scroll') { scrolls = true; break; }
+      up = up.parentNode;
+    }
+    if (scrolls) continue;
+    if (node.getBoundingClientRect().right > docWidth + 1) {
+      offenders.push(node.tagName.toLowerCase() + (node.id ? '#' + node.id : ''));
+    }
+  }
+  lines.push('OVERFLOW scroll=' + document.documentElement.scrollWidth + ' client=' + docWidth
+    + ' offenders=' + offenders.length + (offenders.length ? ' ' + offenders.join(',') : ''));
+  lines.push('SELFTEST ok=' + ok + ' fail=' + fail);
+  report.textContent = lines.join('\n');
+  document.getElementById('activate').addEventListener('click', function(){
+    TableGrab.activate({});
+  });
+})();
+</script>
+</body></html>

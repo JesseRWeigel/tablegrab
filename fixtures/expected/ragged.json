@@ -19,13 +19,13 @@
     ["Item", "Measurements", "Measurements", "Measurements", "Measurements"],
     ["Item", "Metric", "Metric", "Imperial", "Imperial"],
     ["Item", "Length (mm)", "Mass (kg)", "Length (in)", "Mass (lb)"],
-    ["Rail [1]", "1 435", "60", "56.5", "132"],
+    ["Rail[1]", "1 435", "60", "56.5", "132"],
     ["Sleeper", "2 600", "250", "", ""],
     ["Ballast", "300", "1 800", "11.8", "3 968"],
     ["Ballast", "350", "1 900", "13.8", "4 189"]
   ],
   "values": [
-    ["Rail [1]", 1435, 60, 56.5, 132],
+    ["Rail[1]", 1435, 60, 56.5, 132],
     ["Sleeper", 2600, 250, null, null],
     ["Ballast", 300, 1800, 11.8, 3968],
     ["Ballast", 350, 1900, 13.8, 4189]
