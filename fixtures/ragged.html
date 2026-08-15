@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Ragged fixture</title></head>
+<body>
+<p>No thead, so the header rows have to be recognised from the cells. Three header rows deep,
+one row short of a full set of cells, a rowspan="0" that runs to the end of the section, a
+footnote marker inside a cell, non-breaking spaces used as thousands separators, and cells
+written without closing tags.</p>
+
+<table border="1">
+  <tr>
+    <th rowspan="3">Item</th>
+    <th colspan="4">Measurements</th>
+  </tr>
+  <tr>
+    <th colspan="2">Metric</th>
+    <th colspan="2">Imperial</th>
+  </tr>
+  <tr>
+    <th>Length (mm)<th>Mass (kg)<th>Length (in)<th>Mass (lb)
+  <tr>
+    <td>Rail<sup>[1]</sup><td>1&nbsp;435<td>60<td>56.5<td>132
+  <tr>
+    <td>Sleeper<td>2&nbsp;600<td>250
+  <tr>
+    <td rowspan="0">Ballast<td>300<td>1&nbsp;800<td>11.8<td>3&nbsp;968
+  <tr>
+    <td>350<td>1&nbsp;900<td>13.8<td>4&nbsp;189
+</table>
+</body></html>

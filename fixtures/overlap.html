@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Overlapping span fixture</title></head>
+<body>
+<p>Malformed on purpose. The rowspan in row 1 reserves the second column of row 2, and the
+colspan="3" in row 2 wants that same slot. A browser drops the overlap, and so does this, with
+a note rather than in silence.</p>
+
+<table>
+  <thead><tr><th>Stage</th><th>Owner</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>Draft</td><td rowspan="2">Ana</td><td>first pass</td></tr>
+    <tr><td colspan="3">carried over from the previous quarter</td></tr>
+    <tr><td>Review</td><td>Bo</td><td>second pass</td></tr>
+  </tbody>
+</table>
+</body></html>

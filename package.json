@@ -1,0 +1,14 @@
+{
+  "name": "tablegrab",
+  "version": "0.1.0",
+  "description": "Turn any HTML table into CSV, JSON, Markdown or SQL, with colspan and rowspan normalisation",
+  "license": "MIT",
+  "main": "src/index.js",
+  "bin": { "tablegrab": "bin/tablegrab.js" },
+  "scripts": {
+    "test": "node --test tests/",
+    "verify": "bash scripts/verify.sh"
+  },
+  "dependencies": {},
+  "engines": { "node": ">=18" }
+}

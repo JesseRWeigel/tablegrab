@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Type inference fixture</title></head>
+<body>
+<p>The values that must survive as text: a version string, a phone number, a postcode with a
+leading zero, a part code. Alongside them the values that must become numbers: parenthesised
+negatives, thousands separators, percentages, a plain zero and a decimal below one.</p>
+
+<table>
+  <caption>Release ledger</caption>
+  <thead>
+    <tr>
+      <th>Package</th><th>Version</th><th>Phone</th><th>ZIP</th><th>Part</th>
+      <th>Change</th><th>Balance</th><th>Rate</th><th>Ratio</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>tablegrab</td><td>1.2.3</td><td>555-0134</td><td>07030</td><td>X-100</td>
+      <td>+12.5%</td><td>(1,234.56)</td><td>0</td><td>1.234</td>
+    </tr>
+    <tr>
+      <td>subwatch</td><td>2.0.0</td><td>555-0199</td><td>02139</td><td>X-200</td>
+      <td>-3.5%</td><td>2,000</td><td>0.5</td><td>2.5</td>
+    </tr>
+    <tr>
+      <td>hexcheck</td><td>10.4.1</td><td>555-1234</td><td>10001</td><td>X-300</td>
+      <td>0%</td><td>-15.5</td><td>1</td><td>0.75</td>
+    </tr>
+  </tbody>
+</table>
+</body></html>
