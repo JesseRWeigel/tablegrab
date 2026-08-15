@@ -73,7 +73,9 @@ BEFORE="$(digest)"
 
 step "unit suite"
 TESTOUT="$(mktemp)"
-node --test "tests/*.test.js" >"$TESTOUT" 2>&1
+# Unquoted on purpose: bash expands the glob, so this works on node 18 as well as
+# on the versions that expand patterns themselves.
+node --test tests/*.test.js >"$TESTOUT" 2>&1
 TESTCODE=$?
 grep -E '^. (tests|pass|fail) ' "$TESTOUT" | sed 's/^/   /'
 check "$TESTCODE"

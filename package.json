@@ -6,7 +6,7 @@
   "main": "src/index.js",
   "bin": { "tablegrab": "bin/tablegrab.js" },
   "scripts": {
-    "test": "node --test tests/",
+    "test": "node --test tests/*.test.js",
     "verify": "bash scripts/verify.sh"
   },
   "dependencies": {},

@@ -25,6 +25,7 @@ and the run is void.
 
 from __future__ import annotations
 
+import glob
 import os
 import shutil
 import subprocess
@@ -163,7 +164,12 @@ def fingerprint(tree: str) -> str | None:
 
 
 def tests_pass(tree: str) -> bool:
-    return run(tree, ["node", "--test", "tests/*.test.js"]).returncode == 0
+    # Expanded here rather than by node, which only learned to do it recently.
+    files = sorted(glob.glob(os.path.join(tree, "tests", "*.test.js")))
+    names = [os.path.join("tests", os.path.basename(name)) for name in files]
+    if not names:
+        raise RuntimeError("no test files in the copied tree")
+    return run(tree, ["node", "--test", *names]).returncode == 0
 
 
 def main() -> int:
